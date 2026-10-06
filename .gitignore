@@ -1,0 +1,24 @@
+# Build .NET
+**/bin/
+**/obj/
+
+# Pengaturan editor lokal
+.vs/
+.idea/
+*.user
+*.suo
+
+# SDK/cache lokal jika digunakan saat development
+.dotnet/
+.nuget/
+
+# Direktori milik environment agent, bukan source Recall
+.agents/
+.codex/
+.aws/
+
+# Data lokal Recall
+*.db
+*.db-shm
+*.db-wal
+*.log

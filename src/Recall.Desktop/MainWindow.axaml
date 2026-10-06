@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Recall.Desktop.MainWindow"
+        Title="Recall"
+        Width="800"
+        Height="500"
+        MinWidth="480"
+        MinHeight="320"
+        WindowStartupLocation="CenterScreen"
+        Background="#D4D0C8">
+    <TextBlock Margin="24"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               Foreground="Black"
+               Text="Recall" />
+</Window>
