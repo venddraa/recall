@@ -19,7 +19,8 @@
                     <MenuItem Header="E_xit" Click="Exit_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Index">
-                    <MenuItem Header="Indexed Folders..." IsEnabled="False" />
+                    <MenuItem x:Name="IndexedFoldersMenuItem" Header="Indexed Folders..."
+                              IsEnabled="False" Click="IndexedFolders_OnClick" />
                     <MenuItem Header="Reindex" IsEnabled="False" />
                 </MenuItem>
                 <MenuItem Header="_Tools">
@@ -67,8 +68,9 @@
                     <StackPanel Grid.Row="1" Margin="24" Spacing="6"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                 IsHitTestVisible="False">
-                        <TextBlock Text="No indexed folders" HorizontalAlignment="Center" />
-                        <TextBlock Text="Search results will appear here after indexing."
+                        <TextBlock x:Name="EmptyStateTitle" Text="Loading folder settings..."
+                                   HorizontalAlignment="Center" />
+                        <TextBlock x:Name="EmptyStateDescription" Text=""
                                    Foreground="#606060" TextWrapping="Wrap"
                                    TextAlignment="Center" />
                     </StackPanel>
@@ -97,10 +99,11 @@
 
         <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
                 Padding="10,6">
-            <Grid ColumnDefinitions="*,Auto,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <TextBlock Text="0 results" />
-                <TextBlock Grid.Column="1" Text="Indexed files: 0" Margin="16,0" />
-                <TextBlock Grid.Column="2" Text="Index: Not configured" />
+                <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0" />
+                <TextBlock Grid.Column="2" Text="Indexed files: 0" Margin="16,0" />
+                <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings" />
             </Grid>
         </Border>
     </Grid>

@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Recall.Core/Recall.Core.csproj" />
     <Project Path="src/Recall.Desktop/Recall.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Recall.Core.Tests/Recall.Core.Tests.csproj" />
   </Folder>
 </Solution>
