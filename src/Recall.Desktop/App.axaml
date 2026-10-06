@@ -4,5 +4,6 @@
              RequestedThemeVariant="Light">
     <Application.Styles>
         <SimpleTheme />
+        <StyleInclude Source="/Styles/Classic.axaml" />
     </Application.Styles>
 </Application>

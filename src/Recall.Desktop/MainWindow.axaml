@@ -2,15 +2,106 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Recall.Desktop.MainWindow"
         Title="Recall"
-        Width="800"
-        Height="500"
-        MinWidth="480"
-        MinHeight="320"
+        Width="940"
+        Height="640"
+        MinWidth="740"
+        MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Background="#D4D0C8">
-    <TextBlock Margin="24"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               Foreground="Black"
-               Text="Recall" />
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Border BorderBrush="#808080" BorderThickness="0,0,0,1">
+            <Menu>
+                <MenuItem Header="_File">
+                    <MenuItem Header="Open File" IsEnabled="False" />
+                    <MenuItem Header="Open Containing Folder" IsEnabled="False" />
+                    <MenuItem Header="Copy Path" IsEnabled="False" />
+                    <Separator />
+                    <MenuItem Header="E_xit" Click="Exit_OnClick" />
+                </MenuItem>
+                <MenuItem Header="_Index">
+                    <MenuItem Header="Indexed Folders..." IsEnabled="False" />
+                    <MenuItem Header="Reindex" IsEnabled="False" />
+                </MenuItem>
+                <MenuItem Header="_Tools">
+                    <MenuItem Header="Settings..." IsEnabled="False" />
+                </MenuItem>
+                <MenuItem Header="_Help">
+                    <MenuItem Header="_About Recall..." Click="About_OnClick" />
+                </MenuItem>
+            </Menu>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="10,12">
+            <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="SearchBox"
+                     Grid.Column="1"
+                     PlaceholderText="Enter words you remember from a file"
+                     AutomationProperties.Name="Search files"
+                     KeyDown="SearchBox_OnKeyDown" />
+            <Button Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
+                    IsEnabled="False" />
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="10,0,10,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" MinHeight="120" />
+                <RowDefinition Height="6" />
+                <RowDefinition Height="140" MinHeight="90" />
+            </Grid.RowDefinitions>
+
+            <Border BorderBrush="#808080" BorderThickness="1" Background="White">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Background="#D4D0C8" BorderBrush="#808080"
+                            BorderThickness="0,0,0,1" Padding="8,6">
+                        <Grid ColumnDefinitions="2*,3*,60,136,84">
+                            <TextBlock Text="Name" />
+                            <TextBlock Grid.Column="1" Text="Folder" Margin="8,0,0,0" />
+                            <TextBlock Grid.Column="2" Text="Type" Margin="8,0,0,0" />
+                            <TextBlock Grid.Column="3" Text="Modified" Margin="8,0,0,0" />
+                            <TextBlock Grid.Column="4" Text="Size" Margin="8,0,0,0" />
+                        </Grid>
+                    </Border>
+
+                    <ListBox x:Name="ResultsList" Grid.Row="1" BorderThickness="0"
+                             AutomationProperties.Name="Search results" />
+                    <StackPanel Grid.Row="1" Margin="24" Spacing="6"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsHitTestVisible="False">
+                        <TextBlock Text="No indexed folders" HorizontalAlignment="Center" />
+                        <TextBlock Text="Search results will appear here after indexing."
+                                   Foreground="#606060" TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Row="1" ResizeDirection="Rows"
+                          ResizeBehavior="PreviousAndNext"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          Background="#D4D0C8"
+                          AutomationProperties.Name="Resize content preview" />
+
+            <Border Grid.Row="2" BorderBrush="#808080" BorderThickness="1">
+                <Grid RowDefinitions="Auto,*">
+                    <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Padding="8,5">
+                        <TextBlock Text="Content preview" />
+                    </Border>
+                    <TextBox Grid.Row="1" IsReadOnly="True" BorderThickness="0"
+                             TextWrapping="Wrap" Background="#F5F5F5"
+                             Foreground="#606060" Padding="10"
+                             Text="Select a search result to see its matching text."
+                             AutomationProperties.Name="Matching file content" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
+                Padding="10,6">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Text="0 results" />
+                <TextBlock Grid.Column="1" Text="Indexed files: 0" Margin="16,0" />
+                <TextBlock Grid.Column="2" Text="Index: Not configured" />
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

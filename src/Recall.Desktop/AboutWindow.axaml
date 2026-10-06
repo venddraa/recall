@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Recall.Desktop.AboutWindow"
+        Title="About Recall"
+        Width="400"
+        Height="220"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#D4D0C8">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+        <TextBlock Text="Recall" FontWeight="Bold" />
+        <TextBlock Grid.Row="1" Margin="0,12,0,16" TextWrapping="Wrap"
+                   Text="Find local files by the words you remember.&#10;&#10;Your files stay on your computer." />
+        <Button Grid.Row="2" Content="OK" MinWidth="76"
+                HorizontalAlignment="Right" IsDefault="True" IsCancel="True"
+                Click="Close_OnClick" />
+    </Grid>
+</Window>

@@ -1,0 +1,24 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style Selector="Window">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="Black" />
+    </Style>
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="#D4D0C8" />
+    </Style>
+    <Style Selector="Button">
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="12,4" />
+    </Style>
+    <Style Selector="TextBox">
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Background" Value="White" />
+        <Setter Property="BorderBrush" Value="#808080" />
+    </Style>
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="White" />
+    </Style>
+</Styles>
