@@ -21,6 +21,11 @@
                 <MenuItem Header="_Index">
                     <MenuItem x:Name="IndexedFoldersMenuItem" Header="Indexed Folders..."
                               IsEnabled="False" Click="IndexedFolders_OnClick" />
+                    <Separator />
+                    <MenuItem x:Name="ScanFoldersMenuItem" Header="Scan Folders"
+                              IsEnabled="False" Click="ScanFolders_OnClick" />
+                    <MenuItem x:Name="CancelScanMenuItem" Header="Cancel Scan"
+                              IsEnabled="False" Click="CancelScan_OnClick" />
                     <MenuItem Header="Reindex" IsEnabled="False" />
                 </MenuItem>
                 <MenuItem Header="_Tools">
