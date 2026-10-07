@@ -3,8 +3,10 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Microsoft.Data.Sqlite;
 using Recall.Core.Folders;
 using Recall.Core.Scanning;
+using Recall.Core.Storage;
 
 namespace Recall.Desktop;
 
@@ -13,6 +15,9 @@ public partial class MainWindow : Window
     private FolderConfigurationStore? _folderStore;
     private IReadOnlyList<string> _folders = Array.Empty<string>();
     private CancellationTokenSource? _scanCancellation;
+    private FileMetadataStore? _metadataStore;
+    private bool _databaseReady;
+    private long _storedFileCount;
 
     public MainWindow()
     {
@@ -41,6 +46,41 @@ public partial class MainWindow : Window
             this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                 $"Check {_folderStore?.FilePath ?? "your configuration directory"} and restart Recall. The configuration has been left unchanged.";
             this.FindControl<TextBlock>("IndexStatusText")!.Text = "Index: Configuration error";
+            return;
+        }
+
+        if (!IsVisible)
+        {
+            return;
+        }
+
+        this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Loading";
+        this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Loading saved file metadata...";
+        try
+        {
+            var databasePath = RecallDataPath.GetDatabasePath(
+                Environment.GetEnvironmentVariable("XDG_DATA_HOME"),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            _metadataStore = new FileMetadataStore(databasePath);
+            await _metadataStore.InitializeAsync();
+            _storedFileCount = await _metadataStore.GetFileCountAsync();
+            _databaseReady = true;
+            if (IsVisible)
+            {
+                UpdateFolderStatus();
+            }
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Could not open the metadata database: {0}", exception);
+            if (IsVisible)
+            {
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Could not open the metadata database";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
+                    $"Check {_metadataStore?.DatabasePath ?? "your application data directory"} and restart Recall. Your folder selection is still available.";
+                this.FindControl<TextBlock>("StoredFileCountText")!.Text = "Stored files: Unavailable";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Error";
+            }
         }
     }
 
@@ -60,22 +100,31 @@ public partial class MainWindow : Window
     private void UpdateFolderStatus()
     {
         var hasFolders = _folders.Count > 0;
-        this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = hasFolders;
+        this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = hasFolders && _databaseReady;
         this.FindControl<TextBlock>("FolderCountText")!.Text = $"Folders: {_folders.Count}";
+        if (!_databaseReady)
+        {
+            return;
+        }
+
+        this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
         this.FindControl<TextBlock>("IndexStatusText")!.Text = hasFolders
-            ? "Index: Not indexed"
+            ? "Index: Metadata only"
             : "Index: Not configured";
         this.FindControl<TextBlock>("EmptyStateTitle")!.Text = hasFolders
-            ? "No indexed files yet"
+            ? (_storedFileCount > 0 ? "File metadata is saved" : "No metadata saved yet")
             : "No folders selected";
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text = hasFolders
-            ? "Your selected folders are saved. No files have been indexed."
+            ? (_storedFileCount > 0
+                ? $"{_storedFileCount:N0} files stored. Content search is not available yet."
+                : "Choose Index → Scan Folders to save file metadata.")
             : "Choose Index → Indexed Folders to add a folder.";
     }
 
     private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_scanCancellation is not null || _folders.Count == 0)
+        var metadataStore = _metadataStore;
+        if (_scanCancellation is not null || _folders.Count == 0 || !_databaseReady || metadataStore is null)
         {
             return;
         }
@@ -88,11 +137,12 @@ public partial class MainWindow : Window
             "You can keep using Recall or choose Index → Cancel Scan.";
         this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Starting";
 
+        var savingMetadata = false;
         var progress = new Progress<ScanProgress>(value =>
         {
             // Ignore updates queued by a completed, cancelled, or previous scan.
             if (!ReferenceEquals(_scanCancellation, cancellation)
-                || cancellation.IsCancellationRequested || !IsVisible)
+                || cancellation.IsCancellationRequested || savingMetadata || !IsVisible)
             {
                 return;
             }
@@ -103,9 +153,20 @@ public partial class MainWindow : Window
         try
         {
             var result = await new FileScanner().ScanAsync(_folders, progress, cancellation.Token);
+            savingMetadata = true;
             if (IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"Scan completed: {result.Files.Count:N0} files";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Saving file metadata...";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
+                    "You can cancel before the database transaction completes.";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Saving";
+            }
+
+            _storedFileCount = await metadataStore.SaveScanAsync(result.Files, cancellation.Token);
+            if (IsVisible)
+            {
+                this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"Scan saved: {result.Files.Count:N0} files";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     $"{result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped.\nNo file contents have been indexed yet.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Scan: {result.Files.Count:N0} files (complete)";
@@ -118,8 +179,19 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Scan cancelled";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "No files were changed. Choose Index → Scan Folders to start again.";
+                    "Metadata from this scan was not saved. Choose Index → Scan Folders to start again.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Cancelled";
+            }
+        }
+        catch (SqliteException exception) when (exception.SqliteErrorCode is 5 or 6)
+        {
+            Trace.TraceWarning("The metadata database is temporarily locked: {0}", exception.Message);
+            if (IsVisible)
+            {
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "The metadata database is busy";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
+                    "Metadata from this scan was not saved. Try scanning again after other database operations finish.";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Busy";
             }
         }
         catch (Exception exception)
@@ -127,9 +199,11 @@ public partial class MainWindow : Window
             Trace.TraceError("File scan failed: {0}", exception);
             if (IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Could not complete the scan";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = savingMetadata
+                    ? "Could not save file metadata"
+                    : "Could not complete the scan";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "No files were changed. Check the selected folders and try again.";
+                    "Metadata from this scan was not saved. Check the selected folders and database, then try again.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Failed";
             }
         }
@@ -153,7 +227,7 @@ public partial class MainWindow : Window
     private void SetScanningControls(bool scanning)
     {
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = !scanning;
-        this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0;
+        this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
     }
 
