@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Recall.Core.Folders;
 using Recall.Core.Extraction;
 using Recall.Core.Scanning;
+using Recall.Core.Search;
 
 namespace Recall.Core.Storage;
 
@@ -26,7 +27,7 @@ public sealed class FileMetadataStore
             using var versionCommand = connection.CreateCommand();
             versionCommand.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(versionCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (version is not (0 or 1 or 2))
+            if (version is not (0 or 1 or 2 or 3))
             {
                 throw new InvalidDataException($"Unsupported Recall database version: {version}.");
             }
@@ -73,6 +74,28 @@ public sealed class FileMetadataStore
                             OR (status <> 'Extracted' AND content IS NULL))
                     );
                     PRAGMA user_version = 2;
+                    """;
+                migrationCommand.ExecuteNonQuery();
+                cancellationToken.ThrowIfCancellationRequested();
+                transaction.Commit();
+            }
+
+            if (version < 3)
+            {
+                using var transaction = connection.BeginTransaction();
+                using var migrationCommand = connection.CreateCommand();
+                migrationCommand.Transaction = transaction;
+                migrationCommand.CommandText = """
+                    CREATE VIRTUAL TABLE file_search USING fts5(
+                        filename,
+                        content,
+                        tokenize = 'unicode61 remove_diacritics 2'
+                    );
+                    INSERT INTO file_search(rowid, filename, content)
+                    SELECT m.id, m.filename, COALESCE(t.content, '')
+                    FROM file_metadata AS m
+                    LEFT JOIN file_text AS t ON t.file_id = m.id;
+                    PRAGMA user_version = 3;
                     """;
                 migrationCommand.ExecuteNonQuery();
                 cancellationToken.ThrowIfCancellationRequested();
@@ -161,6 +184,19 @@ public sealed class FileMetadataStore
         var invalidateSize = invalidateCommand.Parameters.Add("$size", SqliteType.Integer);
         var invalidateModified = invalidateCommand.Parameters.Add("$modified", SqliteType.Text);
         invalidateCommand.Prepare();
+        using var searchCommand = connection.CreateCommand();
+        searchCommand.Transaction = transaction;
+        searchCommand.CommandText = """
+            DELETE FROM file_search WHERE rowid =
+                (SELECT id FROM file_metadata WHERE full_path = $path);
+            INSERT INTO file_search(rowid, filename, content)
+            SELECT m.id, m.filename, COALESCE(t.content, '')
+            FROM file_metadata AS m
+            LEFT JOIN file_text AS t ON t.file_id = m.id
+            WHERE m.full_path = $path;
+            """;
+        var searchPath = searchCommand.Parameters.Add("$path", SqliteType.Text);
+        searchCommand.Prepare();
         var extracted = 0;
         var skipped = new Dictionary<TextExtractionStatus, int>();
         var processed = 0;
@@ -207,6 +243,9 @@ public sealed class FileMetadataStore
                     timer.Restart();
                 }
             }
+
+            searchPath.Value = pathParameter.Value;
+            searchCommand.ExecuteNonQuery();
         }
 
         using var countCommand = connection.CreateCommand();
@@ -243,6 +282,59 @@ public sealed class FileMetadataStore
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM file_text WHERE status = 'Extracted';";
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 500);
+        var expression = SearchQuery.BuildFtsExpression(query);
+        if (expression is null)
+        {
+            return Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>());
+        }
+
+        return Task.Run<IReadOnlyList<SearchResult>>(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
+                    bm25(file_search, 10.0, 1.0) AS rank
+                FROM file_search
+                JOIN file_metadata AS m ON m.id = file_search.rowid
+                WHERE file_search MATCH $query
+                ORDER BY rank, m.filename COLLATE NOCASE, m.full_path
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$query", expression);
+            command.Parameters.AddWithValue("$limit", limit);
+            using var registration = cancellationToken.Register(command.Cancel);
+            var results = new List<SearchResult>();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    results.Add(new SearchResult(
+                        reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6)));
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (SqliteException exception) when (cancellationToken.IsCancellationRequested
+                                                     && exception.SqliteErrorCode == 9)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            return results.AsReadOnly();
         }, cancellationToken);
     }
 

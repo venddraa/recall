@@ -36,7 +36,7 @@ public sealed class FileMetadataStoreTests : IDisposable
         using var connection = OpenConnection(store.DatabasePath);
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(2L, command.ExecuteScalar());
+        Assert.Equal(3L, command.ExecuteScalar());
         command.CommandText = "PRAGMA journal_mode;";
         Assert.Equal("wal", command.ExecuteScalar());
     }
@@ -156,7 +156,7 @@ public sealed class FileMetadataStoreTests : IDisposable
         using (var connection = OpenConnection(store.DatabasePath))
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version = 3;";
+            command.CommandText = "PRAGMA user_version = 4;";
             command.ExecuteNonQuery();
         }
 
