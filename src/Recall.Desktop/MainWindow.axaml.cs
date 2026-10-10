@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Microsoft.Data.Sqlite;
+using Recall.Core.Extraction;
 using Recall.Core.Folders;
 using Recall.Core.Scanning;
 using Recall.Core.Storage;
@@ -12,12 +13,14 @@ namespace Recall.Desktop;
 
 public partial class MainWindow : Window
 {
+    private const int MaximumTextFileBytes = 5 * 1024 * 1024;
     private FolderConfigurationStore? _folderStore;
     private IReadOnlyList<string> _folders = Array.Empty<string>();
     private CancellationTokenSource? _scanCancellation;
     private FileMetadataStore? _metadataStore;
     private bool _databaseReady;
     private long _storedFileCount;
+    private long _textFileCount;
 
     public MainWindow()
     {
@@ -64,6 +67,7 @@ public partial class MainWindow : Window
             _metadataStore = new FileMetadataStore(databasePath);
             await _metadataStore.InitializeAsync();
             _storedFileCount = await _metadataStore.GetFileCountAsync();
+            _textFileCount = await _metadataStore.GetTextFileCountAsync();
             _databaseReady = true;
             if (IsVisible)
             {
@@ -109,15 +113,15 @@ public partial class MainWindow : Window
 
         this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
         this.FindControl<TextBlock>("IndexStatusText")!.Text = hasFolders
-            ? "Index: Metadata only"
+            ? $"Text files: {_textFileCount:N0}"
             : "Index: Not configured";
         this.FindControl<TextBlock>("EmptyStateTitle")!.Text = hasFolders
             ? (_storedFileCount > 0 ? "File metadata is saved" : "No metadata saved yet")
             : "No folders selected";
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text = hasFolders
             ? (_storedFileCount > 0
-                ? $"{_storedFileCount:N0} files stored. Content search is not available yet."
-                : "Choose Index → Scan Folders to save file metadata.")
+                ? $"{_storedFileCount:N0} files stored; {_textFileCount:N0} with extracted text. Content search is not available yet.\nChoose Index → Scan Folders to extract plain-text files (maximum 5 MiB each)."
+                : "Choose Index → Scan Folders to save metadata and extract plain-text files (maximum 5 MiB each).")
             : "Choose Index → Indexed Folders to add a folder.";
     }
 
@@ -156,20 +160,35 @@ public partial class MainWindow : Window
             savingMetadata = true;
             if (IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Saving file metadata...";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving plain-text files...";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     "You can cancel before the database transaction completes.";
-                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Saving";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text: 0 / {result.Files.Count:N0} files";
             }
 
-            _storedFileCount = await metadataStore.SaveScanAsync(result.Files, cancellation.Token);
+            var textProgress = new Progress<TextIndexProgress>(value =>
+            {
+                if (ReferenceEquals(_scanCancellation, cancellation)
+                    && !cancellation.IsCancellationRequested && IsVisible)
+                {
+                    this.FindControl<TextBlock>("IndexStatusText")!.Text =
+                        $"Text: {value.ProcessedFiles:N0} / {result.Files.Count:N0} files";
+                }
+            });
+            var saved = await metadataStore.IndexScanAsync(result.Files,
+                new PlainTextExtractor(MaximumTextFileBytes), textProgress, cancellation.Token);
+            _storedFileCount = saved.StoredFiles;
+            _textFileCount = saved.StoredTextFiles;
             if (IsVisible)
             {
                 this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"Scan saved: {result.Files.Count:N0} files";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    $"{result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped.\nNo file contents have been indexed yet.";
-                this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Scan: {result.Files.Count:N0} files (complete)";
+                    $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n"
+                    + FormatSkippedContent(saved)
+                    + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
+                    + "\nContent search is not available yet.";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text files: {_textFileCount:N0} (complete)";
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -179,7 +198,7 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Scan cancelled";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Metadata from this scan was not saved. Choose Index → Scan Folders to start again.";
+                    "Metadata and text from this scan were not saved. Choose Index → Scan Folders to start again.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Cancelled";
             }
         }
@@ -215,6 +234,16 @@ public partial class MainWindow : Window
                 SetScanningControls(false);
             }
         }
+    }
+
+    private static string FormatSkippedContent(TextIndexResult result)
+    {
+        var skipped = result.SkippedFiles;
+        var unsupported = skipped.GetValueOrDefault(TextExtractionStatus.Unsupported);
+        var tooLarge = skipped.GetValueOrDefault(TextExtractionStatus.TooLarge);
+        var failed = skipped.Where(pair => pair.Key is not (TextExtractionStatus.Unsupported or TextExtractionStatus.TooLarge))
+            .Sum(pair => pair.Value);
+        return $"Content skipped: {unsupported:N0} unsupported; {tooLarge:N0} over 5 MiB; {failed:N0} unreadable, changed, binary, or linked.";
     }
 
     private void CancelScan_OnClick(object? sender, RoutedEventArgs e)
