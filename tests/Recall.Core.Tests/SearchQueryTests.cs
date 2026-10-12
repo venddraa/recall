@@ -5,11 +5,13 @@ namespace Recall.Core.Tests;
 public sealed class SearchQueryTests
 {
     [Theory]
-    [InlineData("clear sky index", "\"clear\" AND \"sky\" AND \"index\"")]
-    [InlineData("  paper_final.md  ", "\"paper\" AND \"final\" AND \"md\"")]
-    [InlineData("café déjà-vu", "\"café\" AND \"déjà\" AND \"vu\"")]
-    [InlineData("one OR two", "\"one\" AND \"OR\" AND \"two\"")]
-    [InlineData("judul 日本語 123", "\"judul\" AND \"日本語\" AND \"123\"")]
+    [InlineData("clear sky index", "\"clear\"* AND \"sky\"* AND \"index\"*")]
+    [InlineData("  paper_final.md  ", "\"paper\"* AND \"final\"* AND \"md\"")]
+    [InlineData("café déjà-vu", "\"café\"* AND \"déjà\"* AND \"vu\"")]
+    [InlineData("one OR two", "\"one\"* AND \"OR\" AND \"two\"*")]
+    [InlineData("judul 日本語 123", "\"judul\"* AND \"日本語\"* AND \"123\"*")]
+    [InlineData("BAP", "\"BAP\"*")]
+    [InlineData("BA", "\"BA\"")]
     public void BuildsLiteralAndExpressionFromWords(string input, string expected)
     {
         Assert.Equal(expected, SearchQuery.BuildFtsExpression(input));

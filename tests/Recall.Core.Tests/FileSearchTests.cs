@@ -51,6 +51,24 @@ public sealed class FileSearchTests : IDisposable
     }
 
     [Fact]
+    public async Task ThreeCharacterPrefixFindsLongerFilenameAndContentWords()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var filename = await WriteFile("BAPP-report.pdf", "unsupported content");
+        var content = await WriteFile("notes.txt", "Dokumen BAPP sudah ditandatangani");
+        var unrelated = await WriteFile("other.txt", "ABAPP saja");
+        await store.IndexScanAsync([filename, content, unrelated], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var results = await store.SearchAsync("BAP", cancellationToken: Token);
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, result => result.FullPath == filename.FullPath);
+        Assert.Contains(results, result => result.FullPath == content.FullPath);
+        Assert.Empty(await store.SearchAsync("APP", cancellationToken: Token));
+    }
+
+    [Fact]
     public async Task FilenameMatchRanksBeforeContentOnlyMatch()
     {
         var store = CreateStore();

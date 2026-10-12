@@ -10,6 +10,7 @@ public static class SearchQuery
         ArgumentNullException.ThrowIfNull(query);
         var terms = new List<string>();
         var current = new StringBuilder();
+        var characterCount = 0;
 
         void CompleteTerm()
         {
@@ -18,8 +19,10 @@ public static class SearchQuery
                 return;
             }
 
-            terms.Add($"\"{current.ToString().Replace("\"", "\"\"")}\"");
+            var term = $"\"{current}\"";
+            terms.Add(characterCount >= 3 ? term + "*" : term);
             current.Clear();
+            characterCount = 0;
         }
 
         foreach (var rune in query.EnumerateRunes())
@@ -31,6 +34,7 @@ public static class SearchQuery
                     or UnicodeCategory.EnclosingMark)
             {
                 current.Append(rune);
+                characterCount++;
             }
             else
             {
