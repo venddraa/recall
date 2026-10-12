@@ -13,7 +13,8 @@
         <Border BorderBrush="#808080" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
-                    <MenuItem Header="Open File" IsEnabled="False" />
+                    <MenuItem x:Name="OpenFileMenuItem" Header="Open File" IsEnabled="False"
+                              Click="OpenFile_OnClick" />
                     <MenuItem Header="Open Containing Folder" IsEnabled="False" />
                     <MenuItem x:Name="CopyPathMenuItem" Header="Copy Path" IsEnabled="False"
                               Click="CopyPath_OnClick" />
@@ -73,6 +74,7 @@
 
                     <ListBox x:Name="ResultsList" Grid.Row="1" BorderThickness="0"
                              SelectionChanged="ResultsList_OnSelectionChanged"
+                             DoubleTapped="ResultsList_OnDoubleTapped"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="Search results">
                         <ListBox.Styles>

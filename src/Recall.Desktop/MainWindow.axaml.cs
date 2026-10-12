@@ -4,6 +4,8 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Microsoft.Data.Sqlite;
 using Recall.Core.Extraction;
 using Recall.Core.Folders;
@@ -25,6 +27,7 @@ public partial class MainWindow : Window
     private long _textFileCount;
     private CancellationTokenSource? _searchCancellation;
     private bool _copyingPath;
+    private bool _openingFile;
 
     public MainWindow()
     {
@@ -372,7 +375,7 @@ public partial class MainWindow : Window
 
     private void ResultsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        UpdateCopyPathMenu();
+        UpdateFileActionMenus();
         var preview = this.FindControl<TextBox>("ContentPreview");
         if (preview is null)
             return;
@@ -392,7 +395,7 @@ public partial class MainWindow : Window
     {
         CancelSearch();
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
-        UpdateCopyPathMenu();
+        UpdateFileActionMenus();
         this.FindControl<TextBox>("ContentPreview")!.Text = "Select a search result to see its matching text.";
         this.FindControl<TextBlock>("ResultCountText")!.Text = "0 results";
         this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = true;
@@ -406,11 +409,15 @@ public partial class MainWindow : Window
             && _folders.Count > 0 && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text);
     }
 
-    private void UpdateCopyPathMenu()
+    private void UpdateFileActionMenus()
     {
+        var hasSelection = this.FindControl<ListBox>("ResultsList")?.SelectedItem is SearchResultRow;
         var menu = this.FindControl<MenuItem>("CopyPathMenuItem");
         if (menu is not null)
-            menu.IsEnabled = !_copyingPath && this.FindControl<ListBox>("ResultsList")?.SelectedItem is SearchResultRow;
+            menu.IsEnabled = !_copyingPath && hasSelection;
+        var openMenu = this.FindControl<MenuItem>("OpenFileMenuItem");
+        if (openMenu is not null)
+            openMenu.IsEnabled = !_openingFile && hasSelection;
     }
 
     private async void CopyPath_OnClick(object? sender, RoutedEventArgs e)
@@ -418,7 +425,7 @@ public partial class MainWindow : Window
         if (_copyingPath || this.FindControl<ListBox>("ResultsList")!.SelectedItem is not SearchResultRow row)
             return;
         _copyingPath = true;
-        UpdateCopyPathMenu();
+        UpdateFileActionMenus();
         try
         {
             var clipboard = Clipboard ?? throw new InvalidOperationException("Clipboard is unavailable.");
@@ -436,7 +443,59 @@ public partial class MainWindow : Window
         {
             _copyingPath = false;
             if (IsVisible)
-                UpdateCopyPathMenu();
+                UpdateFileActionMenus();
+        }
+    }
+
+    private async void OpenFile_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (this.FindControl<ListBox>("ResultsList")!.SelectedItem is SearchResultRow row)
+            await OpenFileAsync(row);
+    }
+
+    private async void ResultsList_OnDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        var item = e.Source as ListBoxItem ?? (e.Source as Control)?.FindAncestorOfType<ListBoxItem>();
+        if (item?.DataContext is not SearchResultRow row)
+            return;
+        e.Handled = true;
+        await OpenFileAsync(row);
+    }
+
+    private async Task OpenFileAsync(SearchResultRow row)
+    {
+        if (_openingFile)
+            return;
+        _openingFile = true;
+        UpdateFileActionMenus();
+        try
+        {
+            var file = new FileInfo(row.FullPath);
+            var exists = await Task.Run(() => file.Exists);
+            if (!IsVisible)
+                return;
+            if (!exists)
+            {
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "File unavailable. Check its location.";
+                return;
+            }
+            var launched = await Launcher.LaunchFileInfoAsync(file);
+            if (IsVisible && _scanCancellation is null)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = launched
+                    ? "File sent to its default application"
+                    : "Could not open file. Check its default application.";
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Could not open the selected file: {0}", exception);
+            if (IsVisible && _scanCancellation is null)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Could not open file. Check its location and permissions.";
+        }
+        finally
+        {
+            _openingFile = false;
+            if (IsVisible)
+                UpdateFileActionMenus();
         }
     }
 }
