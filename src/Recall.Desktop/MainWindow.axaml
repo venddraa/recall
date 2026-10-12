@@ -15,7 +15,8 @@
                 <MenuItem Header="_File">
                     <MenuItem x:Name="OpenFileMenuItem" Header="Open File" IsEnabled="False"
                               Click="OpenFile_OnClick" />
-                    <MenuItem Header="Open Containing Folder" IsEnabled="False" />
+                    <MenuItem x:Name="OpenFolderMenuItem" Header="Open Containing Folder" IsEnabled="False"
+                              Click="OpenFolder_OnClick" />
                     <MenuItem x:Name="CopyPathMenuItem" Header="Copy Path" IsEnabled="False"
                               Click="CopyPath_OnClick" />
                     <Separator />

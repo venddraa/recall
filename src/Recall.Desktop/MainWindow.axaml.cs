@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _searchCancellation;
     private bool _copyingPath;
     private bool _openingFile;
+    private bool _openingFolder;
 
     public MainWindow()
     {
@@ -418,6 +419,9 @@ public partial class MainWindow : Window
         var openMenu = this.FindControl<MenuItem>("OpenFileMenuItem");
         if (openMenu is not null)
             openMenu.IsEnabled = !_openingFile && hasSelection;
+        var folderMenu = this.FindControl<MenuItem>("OpenFolderMenuItem");
+        if (folderMenu is not null)
+            folderMenu.IsEnabled = !_openingFolder && hasSelection;
     }
 
     private async void CopyPath_OnClick(object? sender, RoutedEventArgs e)
@@ -451,6 +455,44 @@ public partial class MainWindow : Window
     {
         if (this.FindControl<ListBox>("ResultsList")!.SelectedItem is SearchResultRow row)
             await OpenFileAsync(row);
+    }
+
+    private async void OpenFolder_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_openingFolder || this.FindControl<ListBox>("ResultsList")!.SelectedItem is not SearchResultRow row)
+            return;
+        _openingFolder = true;
+        UpdateFileActionMenus();
+        try
+        {
+            var directory = new FileInfo(row.FullPath).Directory;
+            var exists = await Task.Run(() => directory?.Exists == true);
+            if (!IsVisible)
+                return;
+            if (!exists)
+            {
+                if (_scanCancellation is null)
+                    this.FindControl<TextBlock>("IndexStatusText")!.Text = "Folder unavailable. Check its location.";
+                return;
+            }
+            var launched = await Launcher.LaunchDirectoryInfoAsync(directory!);
+            if (IsVisible && _scanCancellation is null)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = launched
+                    ? "Folder sent to its default file manager"
+                    : "Could not open folder. Check your file manager.";
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Could not open the containing folder: {0}", exception);
+            if (IsVisible && _scanCancellation is null)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Could not open folder. Check its location and permissions.";
+        }
+        finally
+        {
+            _openingFolder = false;
+            if (IsVisible)
+                UpdateFileActionMenus();
+        }
     }
 
     private async void ResultsList_OnDoubleTapped(object? sender, TappedEventArgs e)
