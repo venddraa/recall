@@ -15,7 +15,8 @@
                 <MenuItem Header="_File">
                     <MenuItem Header="Open File" IsEnabled="False" />
                     <MenuItem Header="Open Containing Folder" IsEnabled="False" />
-                    <MenuItem Header="Copy Path" IsEnabled="False" />
+                    <MenuItem x:Name="CopyPathMenuItem" Header="Copy Path" IsEnabled="False"
+                              Click="CopyPath_OnClick" />
                     <Separator />
                     <MenuItem Header="E_xit" Click="Exit_OnClick" />
                 </MenuItem>

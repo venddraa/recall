@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Microsoft.Data.Sqlite;
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
     private long _storedFileCount;
     private long _textFileCount;
     private CancellationTokenSource? _searchCancellation;
+    private bool _copyingPath;
 
     public MainWindow()
     {
@@ -370,6 +372,7 @@ public partial class MainWindow : Window
 
     private void ResultsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        UpdateCopyPathMenu();
         var preview = this.FindControl<TextBox>("ContentPreview");
         if (preview is null)
             return;
@@ -389,6 +392,7 @@ public partial class MainWindow : Window
     {
         CancelSearch();
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
+        UpdateCopyPathMenu();
         this.FindControl<TextBox>("ContentPreview")!.Text = "Select a search result to see its matching text.";
         this.FindControl<TextBlock>("ResultCountText")!.Text = "0 results";
         this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = true;
@@ -400,5 +404,39 @@ public partial class MainWindow : Window
     {
         this.FindControl<Button>("FindButton")!.IsEnabled = _databaseReady && _scanCancellation is null
             && _folders.Count > 0 && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text);
+    }
+
+    private void UpdateCopyPathMenu()
+    {
+        var menu = this.FindControl<MenuItem>("CopyPathMenuItem");
+        if (menu is not null)
+            menu.IsEnabled = !_copyingPath && this.FindControl<ListBox>("ResultsList")?.SelectedItem is SearchResultRow;
+    }
+
+    private async void CopyPath_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_copyingPath || this.FindControl<ListBox>("ResultsList")!.SelectedItem is not SearchResultRow row)
+            return;
+        _copyingPath = true;
+        UpdateCopyPathMenu();
+        try
+        {
+            var clipboard = Clipboard ?? throw new InvalidOperationException("Clipboard is unavailable.");
+            await clipboard.SetTextAsync(row.FullPath);
+            if (IsVisible)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Path copied";
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Could not copy the file path: {0}", exception);
+            if (IsVisible)
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Could not copy path. Try again.";
+        }
+        finally
+        {
+            _copyingPath = false;
+            if (IsVisible)
+                UpdateCopyPathMenu();
+        }
     }
 }
