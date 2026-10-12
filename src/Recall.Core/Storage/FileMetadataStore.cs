@@ -287,12 +287,27 @@ public sealed class FileMetadataStore
 
     public Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int limit = 100,
         CancellationToken cancellationToken = default)
+        => SearchIndexAsync(query, null, limit, cancellationToken);
+
+    public Task<IReadOnlyList<SearchResult>> SearchFoldersAsync(string query, IEnumerable<string> folders,
+        int limit = 100, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        var prefixes = folders.Select(FolderPath.Normalize).Distinct(StringComparer.Ordinal)
+            .Select(path => Path.EndsInDirectorySeparator(path) ? path : path + Path.DirectorySeparatorChar)
+            .ToArray();
+        return SearchIndexAsync(query, prefixes, limit, cancellationToken);
+    }
+
+    private Task<IReadOnlyList<SearchResult>> SearchIndexAsync(string query, string[]? folderPrefixes,
+        int limit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 500);
+        cancellationToken.ThrowIfCancellationRequested();
         var expression = SearchQuery.BuildFtsExpression(query);
-        if (expression is null)
+        if (expression is null || folderPrefixes is { Length: 0 })
         {
             return Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>());
         }
@@ -304,16 +319,32 @@ public sealed class FileMetadataStore
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
-                    bm25(file_search, 10.0, 1.0) AS rank
+                    bm25(file_search, 10.0, 1.0) AS rank,
+                    snippet(file_search, 1, '', '', ' … ', 32)
                 FROM file_search
                 JOIN file_metadata AS m ON m.id = file_search.rowid
                 WHERE file_search MATCH $query
                 ORDER BY rank, m.filename COLLATE NOCASE, m.full_path
                 LIMIT $limit;
                 """;
+            if (folderPrefixes is not null)
+            {
+                var filters = new List<string>();
+                for (var index = 0; index < folderPrefixes.Length; index++)
+                {
+                    var name = "$folder" + index.ToString(CultureInfo.InvariantCulture);
+                    filters.Add($"instr(m.full_path, {name}) = 1");
+                    command.Parameters.AddWithValue(name, folderPrefixes[index]);
+                }
+                command.CommandText = command.CommandText.Replace("WHERE file_search MATCH $query",
+                    "WHERE file_search MATCH $query AND (" + string.Join(" OR ", filters) + ")");
+            }
             command.Parameters.AddWithValue("$query", expression);
             command.Parameters.AddWithValue("$limit", limit);
-            using var registration = cancellationToken.Register(command.Cancel);
+            // SqliteCommand.Cancel is a no-op. Each search owns its connection, so interrupting
+            // this handle only stops this query. Dispose the registration before closing it.
+            var handle = connection.Handle!;
+            using var registration = cancellationToken.Register(() => SQLitePCL.raw.sqlite3_interrupt(handle));
             var results = new List<SearchResult>();
             try
             {
@@ -324,7 +355,7 @@ public sealed class FileMetadataStore
                     cancellationToken.ThrowIfCancellationRequested();
                     results.Add(new SearchResult(
                         reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6)));
+                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6), reader.GetString(7)));
                 }
                 cancellationToken.ThrowIfCancellationRequested();
             }

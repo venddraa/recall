@@ -7,4 +7,5 @@ public sealed record SearchResult(
     string Extension,
     long Size,
     DateTime ModifiedAtUtc,
-    double Rank);
+    double Rank,
+    string Snippet = "");

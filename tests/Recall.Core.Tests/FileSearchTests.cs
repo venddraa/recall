@@ -17,6 +17,7 @@ public sealed class FileSearchTests : IDisposable
         var folder = Path.Combine(_directory, "documents");
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, text, new UTF8Encoding(false), Token);
         var info = new FileInfo(path);
         return new(path, info.Name, info.Extension, info.Length, info.LastWriteTimeUtc);
@@ -196,6 +197,86 @@ public sealed class FileSearchTests : IDisposable
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.SearchAsync("anything", cancellationToken: cancellation.Token));
         await Assert.ThrowsAsync<ArgumentNullException>(() => store.SearchAsync(null!, cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task SnippetShowsMatchBeyondTheBeginningWithoutReturningWholeDocument()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("long.txt", string.Join(" ", Enumerable.Repeat("intro", 200))
+            + " remembered phrase " + string.Join(" ", Enumerable.Repeat("outro", 200)));
+        await store.IndexScanAsync([file], new PlainTextExtractor(10000), cancellationToken: Token);
+        var result = Assert.Single(await store.SearchAsync("remembered phrase", cancellationToken: Token));
+        Assert.Contains("remembered phrase", result.Snippet);
+        Assert.True(result.Snippet.Length < 500);
+        Assert.Contains("…", result.Snippet);
+    }
+
+    [Fact]
+    public async Task UnsupportedFilenameMatchHasNoContentSnippet()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("unique-report.pdf", "private unsupported content");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+        Assert.Equal("", Assert.Single(await store.SearchAsync("unique report", cancellationToken: Token)).Snippet);
+    }
+
+    [Fact]
+    public async Task FolderFilterIncludesDescendantsButExcludesSiblingPrefixesAndCaseVariants()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var selected = await WriteFile("Chosen/a.txt", "remembered phrase");
+        var nested = await WriteFile("Chosen/nested/b.txt", "remembered phrase");
+        var sibling = await WriteFile("ChosenOther/c.txt", "remembered phrase");
+        var differentCase = await WriteFile("chosen/d.txt", "remembered phrase");
+        await store.IndexScanAsync([selected, nested, sibling, differentCase], new PlainTextExtractor(1024), cancellationToken: Token);
+        var root = Path.GetDirectoryName(selected.FullPath)!;
+        var results = await store.SearchFoldersAsync("remembered phrase", [root, root + "/"], cancellationToken: Token);
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, result => result.FullPath == selected.FullPath);
+        Assert.Contains(results, result => result.FullPath == nested.FullPath);
+        Assert.Empty(await store.SearchFoldersAsync("remembered phrase", [], cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task FolderFilterUsesLiteralPathsAndCanSearchMultipleRoots()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var first = await WriteFile("literal_%'/a.txt", "123 remembered");
+        var other = await WriteFile("literal_AB'/b.txt", "123 remembered");
+        var second = await WriteFile("second/c.txt", "123 remembered");
+        await store.IndexScanAsync([first, other, second], new PlainTextExtractor(1024), cancellationToken: Token);
+        var results = await store.SearchFoldersAsync("123 remembered",
+            [Path.GetDirectoryName(first.FullPath)!, Path.GetDirectoryName(second.FullPath)!], cancellationToken: Token);
+        Assert.Equal(2, results.Count);
+        Assert.DoesNotContain(results, result => result.FullPath == other.FullPath);
+        Assert.Equal(3, (await store.SearchFoldersAsync("123 remembered", ["/"], cancellationToken: Token)).Count);
+    }
+
+    [Fact]
+    public async Task SearchWorksFromSavedIndexWhenOriginalFileIsUnavailable()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", "remembered content 123");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+        File.Delete(file.FullPath);
+        var result = Assert.Single(await store.SearchFoldersAsync("remembered content",
+            [Path.GetDirectoryName(file.FullPath)!], cancellationToken: Token));
+        Assert.Contains("remembered content 123", result.Snippet);
+    }
+
+    [Fact]
+    public async Task EmptyQueryStillHonorsCancellation()
+    {
+        var store = CreateStore();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.SearchAsync("", cancellationToken: cancellation.Token));
     }
 
     public void Dispose()

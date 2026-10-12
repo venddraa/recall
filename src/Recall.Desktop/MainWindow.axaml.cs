@@ -7,6 +7,7 @@ using Microsoft.Data.Sqlite;
 using Recall.Core.Extraction;
 using Recall.Core.Folders;
 using Recall.Core.Scanning;
+using Recall.Core.Search;
 using Recall.Core.Storage;
 
 namespace Recall.Desktop;
@@ -21,12 +22,17 @@ public partial class MainWindow : Window
     private bool _databaseReady;
     private long _storedFileCount;
     private long _textFileCount;
+    private CancellationTokenSource? _searchCancellation;
 
     public MainWindow()
     {
         AvaloniaXamlLoader.Load(this);
         Opened += MainWindow_OnOpened;
-        Closed += (_, _) => _scanCancellation?.Cancel();
+        Closed += (_, _) =>
+        {
+            _scanCancellation?.Cancel();
+            CancelSearch();
+        };
     }
 
     private async void MainWindow_OnOpened(object? sender, EventArgs e)
@@ -115,14 +121,14 @@ public partial class MainWindow : Window
         this.FindControl<TextBlock>("IndexStatusText")!.Text = hasFolders
             ? $"Text files: {_textFileCount:N0}"
             : "Index: Not configured";
-        this.FindControl<TextBlock>("EmptyStateTitle")!.Text = hasFolders
-            ? (_storedFileCount > 0 ? "File metadata is saved" : "No metadata saved yet")
-            : "No folders selected";
-        this.FindControl<TextBlock>("EmptyStateDescription")!.Text = hasFolders
+        ResetSearchView(hasFolders
+            ? (_storedFileCount > 0 ? "Ready to search" : "No metadata saved yet")
+            : "No folders selected", hasFolders
             ? (_storedFileCount > 0
-                ? $"{_storedFileCount:N0} files stored; {_textFileCount:N0} with extracted text. Content search is not available yet.\nChoose Index → Scan Folders to extract plain-text files (maximum 5 MiB each)."
+                ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched."
                 : "Choose Index → Scan Folders to save metadata and extract plain-text files (maximum 5 MiB each).")
-            : "Choose Index → Indexed Folders to add a folder.";
+            : "Choose Index → Indexed Folders to add a folder.");
+        UpdateFindButton();
     }
 
     private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e)
@@ -135,6 +141,7 @@ public partial class MainWindow : Window
 
         using var cancellation = new CancellationTokenSource();
         _scanCancellation = cancellation;
+        ResetSearchView("Scanning selected folders...", "You can choose Index → Cancel Scan.");
         SetScanningControls(true);
         this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Scanning selected folders...";
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
@@ -162,7 +169,7 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving plain-text files...";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "You can cancel before the database transaction completes.";
+                    "Choose Index → Cancel Scan to stop without saving this scan.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text: 0 / {result.Files.Count:N0} files";
             }
 
@@ -187,7 +194,7 @@ public partial class MainWindow : Window
                     $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n"
                     + FormatSkippedContent(saved)
                     + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
-                    + "\nContent search is not available yet.";
+                    + "\nEnter words you remember, then click Find or press Enter.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text files: {_textFileCount:N0} (complete)";
             }
         }
@@ -258,6 +265,8 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = !scanning;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
+        this.FindControl<TextBox>("SearchBox")!.IsEnabled = !scanning;
+        UpdateFindButton();
     }
 
     private void Exit_OnClick(object? sender, RoutedEventArgs e)
@@ -270,12 +279,126 @@ public partial class MainWindow : Window
         await new AboutWindow().ShowDialog(this);
     }
 
-    private void SearchBox_OnKeyDown(object? sender, KeyEventArgs e)
+    private async void SearchBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape && sender is TextBox searchBox)
         {
             searchBox.Clear();
             e.Handled = true;
         }
+        else if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            await RunSearchAsync();
+        }
+    }
+
+    private void SearchBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        // TextChanged can be raised while the XAML is still loading.
+        if (!_databaseReady || _scanCancellation is not null)
+            return;
+        if (_folders.Count == 0)
+        {
+            UpdateFolderStatus();
+            return;
+        }
+        ResetSearchView("Ready to search", "Click Find or press Enter to search your selected folders.");
+        UpdateFindButton();
+    }
+
+    private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
+
+    private async Task RunSearchAsync()
+    {
+        var store = _metadataStore;
+        var query = this.FindControl<TextBox>("SearchBox")!.Text ?? "";
+        if (!_databaseReady || store is null || _scanCancellation is not null || _folders.Count == 0)
+            return;
+        if (SearchQuery.BuildFtsExpression(query) is null)
+        {
+            ResetSearchView("Enter searchable words", "Type a word, number, or part of a sentence.");
+            return;
+        }
+
+        ResetSearchView("Searching...", "Searching saved filenames and file contents.");
+        using var cancellation = new CancellationTokenSource();
+        _searchCancellation = cancellation;
+        try
+        {
+            // Fetch one extra row so the status can distinguish an exact count from a capped result.
+            var results = await store.SearchFoldersAsync(query, _folders, 101, cancellation.Token);
+            if (!ReferenceEquals(_searchCancellation, cancellation) || cancellation.IsCancellationRequested || !IsVisible)
+                return;
+            var rows = results.Take(100).Select(result => new SearchResultRow(result)).ToArray();
+            this.FindControl<ListBox>("ResultsList")!.ItemsSource = rows;
+            this.FindControl<TextBlock>("ResultCountText")!.Text = results.Count > 100
+                ? "100 results shown (more available)"
+                : $"{rows.Length:N0} results";
+            this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = rows.Length == 0;
+            if (rows.Length == 0)
+            {
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "No matching files";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
+                    "Try different words, or choose Index → Scan Folders if your files have changed.";
+            }
+            else
+            {
+                this.FindControl<ListBox>("ResultsList")!.SelectedIndex = 0;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // A newer query, folder change, scan, or closing window superseded this search.
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("File search failed: {0}", exception);
+            if (ReferenceEquals(_searchCancellation, cancellation) && IsVisible)
+            {
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Could not search the index";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
+                    "Try again. If the problem persists, restart Recall and check the local database.";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_searchCancellation, cancellation))
+                _searchCancellation = null;
+        }
+    }
+
+    private void ResultsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var preview = this.FindControl<TextBox>("ContentPreview");
+        if (preview is null)
+            return;
+        preview.Text =
+            (sender as ListBox)?.SelectedItem is SearchResultRow row
+                ? row.FullPath + "\n\n" + row.Snippet
+                : "Select a search result to see its matching text.";
+    }
+
+    private void CancelSearch()
+    {
+        _searchCancellation?.Cancel();
+        _searchCancellation = null;
+    }
+
+    private void ResetSearchView(string title, string description)
+    {
+        CancelSearch();
+        this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
+        this.FindControl<TextBox>("ContentPreview")!.Text = "Select a search result to see its matching text.";
+        this.FindControl<TextBlock>("ResultCountText")!.Text = "0 results";
+        this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = true;
+        this.FindControl<TextBlock>("EmptyStateTitle")!.Text = title;
+        this.FindControl<TextBlock>("EmptyStateDescription")!.Text = description;
+    }
+
+    private void UpdateFindButton()
+    {
+        this.FindControl<Button>("FindButton")!.IsEnabled = _databaseReady && _scanCancellation is null
+            && _folders.Count > 0 && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text);
     }
 }

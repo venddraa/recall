@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Recall.Desktop"
         x:Class="Recall.Desktop.MainWindow"
         Title="Recall"
         Width="940"
@@ -43,9 +44,10 @@
                      Grid.Column="1"
                      PlaceholderText="Enter words you remember from a file"
                      AutomationProperties.Name="Search files"
+                     TextChanged="SearchBox_OnTextChanged"
                      KeyDown="SearchBox_OnKeyDown" />
-            <Button Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
-                    IsEnabled="False" />
+            <Button x:Name="FindButton" Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
+                    IsEnabled="False" Click="Find_OnClick" />
         </Grid>
 
         <Grid Grid.Row="2" Margin="10,0,10,10">
@@ -69,8 +71,33 @@
                     </Border>
 
                     <ListBox x:Name="ResultsList" Grid.Row="1" BorderThickness="0"
-                             AutomationProperties.Name="Search results" />
-                    <StackPanel Grid.Row="1" Margin="24" Spacing="6"
+                             SelectionChanged="ResultsList_OnSelectionChanged"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.Name="Search results">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="8,6" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="local:SearchResultRow">
+                                <Grid ColumnDefinitions="2*,3*,60,136,84">
+                                    <TextBlock Text="{Binding Filename}" TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding FullPath}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Folder}" Margin="8,0,0,0"
+                                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="8,0,0,0"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Modified}" Margin="8,0,0,0"
+                                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Modified}" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Size}" Margin="8,0,0,0"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel x:Name="EmptyStatePanel" Grid.Row="1" Margin="24" Spacing="6"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                 IsHitTestVisible="False">
                         <TextBlock x:Name="EmptyStateTitle" Text="Loading folder settings..."
@@ -93,7 +120,7 @@
                     <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Padding="8,5">
                         <TextBlock Text="Content preview" />
                     </Border>
-                    <TextBox Grid.Row="1" IsReadOnly="True" BorderThickness="0"
+                    <TextBox x:Name="ContentPreview" Grid.Row="1" IsReadOnly="True" BorderThickness="0"
                              TextWrapping="Wrap" Background="#F5F5F5"
                              Foreground="#606060" Padding="10"
                              Text="Select a search result to see its matching text."
@@ -105,7 +132,7 @@
         <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
                 Padding="10,6">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                <TextBlock Text="0 results" />
+                <TextBlock x:Name="ResultCountText" Text="0 results" />
                 <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0" />
                 <TextBlock x:Name="StoredFileCountText" Grid.Column="2" Text="Stored files: 0" Margin="16,0" />
                 <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings" />
