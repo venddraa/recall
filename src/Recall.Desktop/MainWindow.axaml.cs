@@ -134,7 +134,7 @@ public partial class MainWindow : Window
             : "No folders selected", hasFolders
             ? (_storedFileCount > 0
                 ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched."
-                : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs and DOCX documents (up to 20 MiB).")
+                : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
         UpdateFindButton();
     }

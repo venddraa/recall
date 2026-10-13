@@ -7,6 +7,7 @@ public sealed class FileTextExtractor : ITextExtractor
     private readonly PlainTextExtractor _plainText;
     private readonly PdfTextExtractor _pdf;
     private readonly DocxTextExtractor _docx;
+    private readonly NotebookTextExtractor _notebook;
 
     public FileTextExtractor(int maximumTextFileBytes, int maximumDocumentFileBytes,
         int maximumExtractedDocumentTextCharacters)
@@ -16,6 +17,7 @@ public sealed class FileTextExtractor : ITextExtractor
         _plainText = new(maximumTextFileBytes);
         _pdf = new(maximumDocumentFileBytes, maximumExtractedDocumentTextCharacters);
         _docx = new(maximumDocumentFileBytes, maximumExtractedDocumentTextCharacters);
+        _notebook = new(maximumDocumentFileBytes, maximumExtractedDocumentTextCharacters);
     }
 
     public bool CanReuse(ScannedFile file) => GetExtractor(file).CanReuse(file);
@@ -27,6 +29,7 @@ public sealed class FileTextExtractor : ITextExtractor
     {
         ".pdf" => _pdf,
         ".docx" => _docx,
+        ".ipynb" => _notebook,
         _ => _plainText
     };
 }
