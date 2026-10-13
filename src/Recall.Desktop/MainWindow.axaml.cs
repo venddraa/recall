@@ -18,6 +18,8 @@ namespace Recall.Desktop;
 public partial class MainWindow : Window
 {
     private const int MaximumTextFileBytes = 5 * 1024 * 1024;
+    private const int MaximumPdfFileBytes = 20 * 1024 * 1024;
+    private const int MaximumPdfTextCharacters = 5 * 1024 * 1024;
     private FolderConfigurationStore? _folderStore;
     private IReadOnlyList<string> _folders = Array.Empty<string>();
     private CancellationTokenSource? _scanCancellation;
@@ -132,7 +134,7 @@ public partial class MainWindow : Window
             : "No folders selected", hasFolders
             ? (_storedFileCount > 0
                 ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched."
-                : "Choose Index → Scan Folders to save metadata and extract plain-text files (maximum 5 MiB each).")
+                : "Choose Index → Scan Folders to index text files (up to 5 MiB) and text-layer PDFs (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
         UpdateFindButton();
     }
@@ -173,7 +175,7 @@ public partial class MainWindow : Window
             savingMetadata = true;
             if (IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving plain-text files...";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving file text...";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     "Choose Index → Cancel Scan to stop without saving this scan.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text: 0 / {result.Files.Count:N0} files";
@@ -189,7 +191,8 @@ public partial class MainWindow : Window
                 }
             });
             var saved = await metadataStore.IndexScanAsync(result.Files,
-                new PlainTextExtractor(MaximumTextFileBytes), textProgress, cancellation.Token);
+                new FileTextExtractor(MaximumTextFileBytes, MaximumPdfFileBytes, MaximumPdfTextCharacters),
+                textProgress, cancellation.Token);
             _storedFileCount = saved.StoredFiles;
             _textFileCount = saved.StoredTextFiles;
             if (IsVisible)
@@ -254,9 +257,10 @@ public partial class MainWindow : Window
         var skipped = result.SkippedFiles;
         var unsupported = skipped.GetValueOrDefault(TextExtractionStatus.Unsupported);
         var tooLarge = skipped.GetValueOrDefault(TextExtractionStatus.TooLarge);
-        var failed = skipped.Where(pair => pair.Key is not (TextExtractionStatus.Unsupported or TextExtractionStatus.TooLarge))
+        var noText = skipped.GetValueOrDefault(TextExtractionStatus.NoSearchableText);
+        var failed = skipped.Where(pair => pair.Key is not (TextExtractionStatus.Unsupported or TextExtractionStatus.TooLarge or TextExtractionStatus.NoSearchableText))
             .Sum(pair => pair.Value);
-        return $"Content skipped: {unsupported:N0} unsupported; {tooLarge:N0} over 5 MiB; {failed:N0} unreadable, changed, binary, or linked.";
+        return $"Content skipped: {unsupported:N0} unsupported; {tooLarge:N0} over size limits; {noText:N0} PDFs without text; {failed:N0} unreadable, changed, or invalid.";
     }
 
     private void CancelScan_OnClick(object? sender, RoutedEventArgs e)

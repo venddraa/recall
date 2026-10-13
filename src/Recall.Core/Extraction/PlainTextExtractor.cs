@@ -7,7 +7,7 @@ using Recall.Core.Scanning;
 
 namespace Recall.Core.Extraction;
 
-public sealed class PlainTextExtractor
+public sealed class PlainTextExtractor : ITextExtractor
 {
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -26,7 +26,7 @@ public sealed class PlainTextExtractor
     public Task<TextExtractionResult> ExtractAsync(ScannedFile file, CancellationToken cancellationToken = default)
         => Task.Run(() => Extract(file, cancellationToken), cancellationToken);
 
-    internal bool CanReuse(ScannedFile file)
+    public bool CanReuse(ScannedFile file)
     {
         try
         {
@@ -42,7 +42,7 @@ public sealed class PlainTextExtractor
         }
     }
 
-    internal TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken)
+    public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!Extensions.Contains(Path.GetExtension(file.FullPath)))
@@ -112,7 +112,7 @@ public sealed class PlainTextExtractor
         return new UTF8Encoding(false, true).GetString(bytes);
     }
 
-    private static bool HasSymbolicLink(string path)
+    internal static bool HasSymbolicLink(string path)
     {
         if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
             return true;
@@ -124,7 +124,7 @@ public sealed class PlainTextExtractor
         return false;
     }
 
-    private static FileStream OpenReadOnly(string path)
+    internal static FileStream OpenReadOnly(string path)
     {
         if (!OperatingSystem.IsLinux())
             return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);

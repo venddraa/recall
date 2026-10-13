@@ -112,7 +112,7 @@ public sealed class FileMetadataStore
         return Task.Run(() => SaveBatch(files, null, null, cancellationToken).StoredFiles, cancellationToken);
     }
 
-    public Task<TextIndexResult> IndexScanAsync(IEnumerable<ScannedFile> files, PlainTextExtractor extractor,
+    public Task<TextIndexResult> IndexScanAsync(IEnumerable<ScannedFile> files, ITextExtractor extractor,
         IProgress<TextIndexProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(files);
@@ -120,7 +120,7 @@ public sealed class FileMetadataStore
         return Task.Run(() => SaveBatch(files, extractor, progress, cancellationToken), cancellationToken);
     }
 
-    private TextIndexResult SaveBatch(IEnumerable<ScannedFile> files, PlainTextExtractor? extractor,
+    private TextIndexResult SaveBatch(IEnumerable<ScannedFile> files, ITextExtractor? extractor,
         IProgress<TextIndexProgress>? progress, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

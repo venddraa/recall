@@ -9,7 +9,9 @@ public enum TextExtractionStatus
     Binary,
     Changed,
     Unavailable,
-    SymbolicLink
+    SymbolicLink,
+    NoSearchableText,
+    ParserFailed
 }
 
 public sealed record TextExtractionResult(TextExtractionStatus Status, string? Text = null);
