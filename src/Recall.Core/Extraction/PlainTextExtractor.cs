@@ -1,8 +1,5 @@
-using System.ComponentModel;
-using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
-using Microsoft.Win32.SafeHandles;
 using Recall.Core.Scanning;
 
 namespace Recall.Core.Extraction;
@@ -26,21 +23,7 @@ public sealed class PlainTextExtractor : ITextExtractor
     public Task<TextExtractionResult> ExtractAsync(ScannedFile file, CancellationToken cancellationToken = default)
         => Task.Run(() => Extract(file, cancellationToken), cancellationToken);
 
-    public bool CanReuse(ScannedFile file)
-    {
-        try
-        {
-            if (file.Size > MaximumFileBytes || HasSymbolicLink(file.FullPath))
-                return false;
-            using var stream = OpenReadOnly(file.FullPath);
-            var info = new FileInfo(file.FullPath);
-            return info.Exists && info.Length == file.Size && info.LastWriteTimeUtc == file.ModifiedAtUtc;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
-        {
-            return false;
-        }
-    }
+    public bool CanReuse(ScannedFile file) => ReadOnlyFileAccess.CanReuse(file, MaximumFileBytes);
 
     public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken)
     {
@@ -50,7 +33,7 @@ public sealed class PlainTextExtractor : ITextExtractor
 
         try
         {
-            if (HasSymbolicLink(file.FullPath))
+            if (ReadOnlyFileAccess.HasSymbolicLink(file.FullPath))
                 return new(TextExtractionStatus.SymbolicLink);
 
             var info = new FileInfo(file.FullPath);
@@ -61,7 +44,7 @@ public sealed class PlainTextExtractor : ITextExtractor
             if (info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedAtUtc)
                 return new(TextExtractionStatus.Changed);
 
-            using var stream = OpenReadOnly(file.FullPath);
+            using var stream = ReadOnlyFileAccess.Open(file.FullPath);
             using var bytes = new MemoryStream();
             var buffer = new byte[16 * 1024];
             int read;
@@ -75,7 +58,7 @@ public sealed class PlainTextExtractor : ITextExtractor
 
             cancellationToken.ThrowIfCancellationRequested();
             info.Refresh();
-            if (HasSymbolicLink(file.FullPath))
+            if (ReadOnlyFileAccess.HasSymbolicLink(file.FullPath))
                 return new(TextExtractionStatus.SymbolicLink);
             if (!info.Exists || info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedAtUtc
                 || bytes.Length != file.Size)
@@ -110,56 +93,5 @@ public sealed class PlainTextExtractor : ITextExtractor
         if (bytes.StartsWith(new byte[] { 0xef, 0xbb, 0xbf }))
             bytes = bytes[3..];
         return new UTF8Encoding(false, true).GetString(bytes);
-    }
-
-    internal static bool HasSymbolicLink(string path)
-    {
-        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            return true;
-        for (var directory = new FileInfo(path).Directory; directory is not null; directory = directory.Parent)
-        {
-            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-                return true;
-        }
-        return false;
-    }
-
-    internal static FileStream OpenReadOnly(string path)
-    {
-        if (!OperatingSystem.IsLinux())
-            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-
-        // A FIFO named *.txt must never block indexing. O_NOFOLLOW also rejects a replaced file symlink.
-        var descriptor = NativeMethods.Open(path, 0x80000 | 0x800 | 0x20000); // CLOEXEC | NONBLOCK | NOFOLLOW, RDONLY = 0
-        if (descriptor < 0)
-            throw new IOException("Could not open the file read-only.", new Win32Exception(Marshal.GetLastPInvokeError()));
-        var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
-        try
-        {
-            if (NativeMethods.Statx(descriptor, "", 0x1000, 1, out var stat) != 0 || (stat.Mode & 0xf000) != 0x8000)
-                throw new IOException("Only regular files can be read for content indexing.");
-            return new FileStream(handle, FileAccess.Read);
-        }
-        catch
-        {
-            handle.Dispose();
-            throw;
-        }
-    }
-
-    private static class NativeMethods
-    {
-        [StructLayout(LayoutKind.Explicit, Size = 256)]
-        internal struct FileStat
-        {
-            [FieldOffset(28)] internal ushort Mode;
-        }
-
-        [DllImport("libc", EntryPoint = "open", SetLastError = true)]
-        internal static extern int Open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
-
-        [DllImport("libc", EntryPoint = "statx", SetLastError = true)]
-        internal static extern int Statx(int descriptor, [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
-            int flags, uint mask, out FileStat stat);
     }
 }

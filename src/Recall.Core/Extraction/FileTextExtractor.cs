@@ -2,20 +2,31 @@ using Recall.Core.Scanning;
 
 namespace Recall.Core.Extraction;
 
-public sealed class FileTextExtractor(int maximumTextFileBytes, int maximumPdfFileBytes,
-    int maximumExtractedPdfTextCharacters) : ITextExtractor
+public sealed class FileTextExtractor : ITextExtractor
 {
-    private readonly PlainTextExtractor _plainText = new(maximumTextFileBytes);
-    private readonly PdfTextExtractor _pdf = new(maximumPdfFileBytes, maximumExtractedPdfTextCharacters);
+    private readonly PlainTextExtractor _plainText;
+    private readonly PdfTextExtractor _pdf;
+    private readonly DocxTextExtractor _docx;
 
-    public bool CanReuse(ScannedFile file) => IsPdf(file)
-        ? _pdf.CanReuse(file)
-        : _plainText.CanReuse(file);
+    public FileTextExtractor(int maximumTextFileBytes, int maximumDocumentFileBytes,
+        int maximumExtractedDocumentTextCharacters)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDocumentFileBytes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumExtractedDocumentTextCharacters);
+        _plainText = new(maximumTextFileBytes);
+        _pdf = new(maximumDocumentFileBytes, maximumExtractedDocumentTextCharacters);
+        _docx = new(maximumDocumentFileBytes, maximumExtractedDocumentTextCharacters);
+    }
 
-    public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken) => IsPdf(file)
-        ? _pdf.Extract(file, cancellationToken)
-        : _plainText.Extract(file, cancellationToken);
+    public bool CanReuse(ScannedFile file) => GetExtractor(file).CanReuse(file);
 
-    private static bool IsPdf(ScannedFile file) =>
-        string.Equals(Path.GetExtension(file.FullPath), ".pdf", StringComparison.OrdinalIgnoreCase);
+    public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken) =>
+        GetExtractor(file).Extract(file, cancellationToken);
+
+    private ITextExtractor GetExtractor(ScannedFile file) => Path.GetExtension(file.FullPath).ToLowerInvariant() switch
+    {
+        ".pdf" => _pdf,
+        ".docx" => _docx,
+        _ => _plainText
+    };
 }

@@ -18,8 +18,8 @@ namespace Recall.Desktop;
 public partial class MainWindow : Window
 {
     private const int MaximumTextFileBytes = 5 * 1024 * 1024;
-    private const int MaximumPdfFileBytes = 20 * 1024 * 1024;
-    private const int MaximumPdfTextCharacters = 5 * 1024 * 1024;
+    private const int MaximumDocumentFileBytes = 20 * 1024 * 1024;
+    private const int MaximumDocumentTextCharacters = 5 * 1024 * 1024;
     private FolderConfigurationStore? _folderStore;
     private IReadOnlyList<string> _folders = Array.Empty<string>();
     private CancellationTokenSource? _scanCancellation;
@@ -134,7 +134,7 @@ public partial class MainWindow : Window
             : "No folders selected", hasFolders
             ? (_storedFileCount > 0
                 ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched."
-                : "Choose Index → Scan Folders to index text files (up to 5 MiB) and text-layer PDFs (up to 20 MiB).")
+                : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs and DOCX documents (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
         UpdateFindButton();
     }
@@ -191,7 +191,7 @@ public partial class MainWindow : Window
                 }
             });
             var saved = await metadataStore.IndexScanAsync(result.Files,
-                new FileTextExtractor(MaximumTextFileBytes, MaximumPdfFileBytes, MaximumPdfTextCharacters),
+                new FileTextExtractor(MaximumTextFileBytes, MaximumDocumentFileBytes, MaximumDocumentTextCharacters),
                 textProgress, cancellation.Token);
             _storedFileCount = saved.StoredFiles;
             _textFileCount = saved.StoredTextFiles;
@@ -260,7 +260,7 @@ public partial class MainWindow : Window
         var noText = skipped.GetValueOrDefault(TextExtractionStatus.NoSearchableText);
         var failed = skipped.Where(pair => pair.Key is not (TextExtractionStatus.Unsupported or TextExtractionStatus.TooLarge or TextExtractionStatus.NoSearchableText))
             .Sum(pair => pair.Value);
-        return $"Content skipped: {unsupported:N0} unsupported; {tooLarge:N0} over size limits; {noText:N0} PDFs without text; {failed:N0} unreadable, changed, or invalid.";
+        return $"Content skipped: {unsupported:N0} unsupported; {tooLarge:N0} over size limits; {noText:N0} documents without text; {failed:N0} unreadable, changed, or invalid.";
     }
 
     private void CancelScan_OnClick(object? sender, RoutedEventArgs e)

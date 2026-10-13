@@ -9,28 +9,14 @@ namespace Recall.Core.Extraction;
 
 internal sealed class PdfTextExtractor(int maximumFileBytes, int maximumTextCharacters) : ITextExtractor
 {
-    public bool CanReuse(ScannedFile file)
-    {
-        try
-        {
-            if (file.Size > maximumFileBytes || PlainTextExtractor.HasSymbolicLink(file.FullPath))
-                return false;
-            using var stream = PlainTextExtractor.OpenReadOnly(file.FullPath);
-            var info = new FileInfo(file.FullPath);
-            return info.Exists && info.Length == file.Size && info.LastWriteTimeUtc == file.ModifiedAtUtc;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
-        {
-            return false;
-        }
-    }
+    public bool CanReuse(ScannedFile file) => ReadOnlyFileAccess.CanReuse(file, maximumFileBytes);
 
     public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            if (PlainTextExtractor.HasSymbolicLink(file.FullPath))
+            if (ReadOnlyFileAccess.HasSymbolicLink(file.FullPath))
                 return new(TextExtractionStatus.SymbolicLink);
             var info = new FileInfo(file.FullPath);
             if (!info.Exists)
@@ -40,7 +26,7 @@ internal sealed class PdfTextExtractor(int maximumFileBytes, int maximumTextChar
             if (info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedAtUtc)
                 return new(TextExtractionStatus.Changed);
 
-            using var stream = PlainTextExtractor.OpenReadOnly(file.FullPath);
+            using var stream = ReadOnlyFileAccess.Open(file.FullPath);
             using var document = PdfDocument.Open(stream);
             var content = new StringBuilder();
             foreach (var page in document.GetPages())
@@ -56,7 +42,7 @@ internal sealed class PdfTextExtractor(int maximumFileBytes, int maximumTextChar
 
             cancellationToken.ThrowIfCancellationRequested();
             info.Refresh();
-            if (PlainTextExtractor.HasSymbolicLink(file.FullPath))
+            if (ReadOnlyFileAccess.HasSymbolicLink(file.FullPath))
                 return new(TextExtractionStatus.SymbolicLink);
             if (!info.Exists || info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedAtUtc
                 || stream.Length != file.Size)
