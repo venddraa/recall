@@ -190,7 +190,7 @@ public partial class MainWindow : Window
                         $"Text: {value.ProcessedFiles:N0} / {result.Files.Count:N0} files";
                 }
             });
-            var saved = await metadataStore.IndexScanAsync(result.Files,
+            var saved = await metadataStore.SynchronizeScanAsync(result, _folders,
                 new FileTextExtractor(MaximumTextFileBytes, MaximumDocumentFileBytes, MaximumDocumentTextCharacters),
                 textProgress, cancellation.Token);
             _storedFileCount = saved.StoredFiles;
@@ -202,6 +202,7 @@ public partial class MainWindow : Window
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n"
                     + FormatSkippedContent(saved)
+                    + $"\nStale index entries removed: {saved.RemovedFiles:N0}; cleanup skipped for {saved.CleanupSkippedFolders:N0} folders with scan errors."
                     + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
                     + "\nEnter words you remember, then click Find or press Enter.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text files: {_textFileCount:N0} (complete)";

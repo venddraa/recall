@@ -120,13 +120,54 @@ public sealed class FileMetadataStore
         return Task.Run(() => SaveBatch(files, extractor, progress, cancellationToken), cancellationToken);
     }
 
+    // Requires a complete scan of the supplied roots. Partial updates must use IndexScanAsync instead.
+    public Task<TextIndexResult> SynchronizeScanAsync(ScanResult scan, IEnumerable<string> selectedFolders,
+        ITextExtractor extractor, IProgress<TextIndexProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(scan);
+        ArgumentNullException.ThrowIfNull(selectedFolders);
+        ArgumentNullException.ThrowIfNull(extractor);
+        var roots = selectedFolders.Select(FolderPath.Normalize).Distinct(StringComparer.Ordinal).ToArray();
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var files = scan.Files.ToArray();
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var path = FolderPath.Normalize(file.FullPath);
+                if (!roots.Any(root => IsWithinFolder(path, root)))
+                    throw new ArgumentException("The scan contains a file outside the selected folders.", nameof(scan));
+            }
+
+            var failures = scan.Failures.Select(failure => FolderPath.Normalize(failure.Path)).ToArray();
+            var completeRoots = roots.Where(root => !failures.Any(path => path == root || IsWithinFolder(path, root)))
+                .ToArray();
+            return SaveBatch(files, extractor, progress, cancellationToken, completeRoots,
+                roots.Length - completeRoots.Length);
+        }, cancellationToken);
+    }
+
     private TextIndexResult SaveBatch(IEnumerable<ScannedFile> files, ITextExtractor? extractor,
-        IProgress<TextIndexProgress>? progress, CancellationToken cancellationToken)
+        IProgress<TextIndexProgress>? progress, CancellationToken cancellationToken,
+        string[]? completeRoots = null, int cleanupSkippedFolders = 0)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Trace.TraceInformation("Saving scanned file metadata.");
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+        using var seenCommand = completeRoots is { Length: > 0 } ? connection.CreateCommand() : null;
+        SqliteParameter? seenPath = null;
+        if (seenCommand is not null)
+        {
+            seenCommand.Transaction = transaction;
+            seenCommand.CommandText = "CREATE TEMP TABLE scan_seen_paths (full_path TEXT PRIMARY KEY COLLATE BINARY);";
+            seenCommand.ExecuteNonQuery();
+            seenCommand.CommandText = "INSERT OR IGNORE INTO scan_seen_paths (full_path) VALUES ($path);";
+            seenPath = seenCommand.Parameters.Add("$path", SqliteType.Text);
+            seenCommand.Prepare();
+        }
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
@@ -206,6 +247,11 @@ public sealed class FileMetadataStore
         {
             cancellationToken.ThrowIfCancellationRequested();
             pathParameter.Value = FolderPath.Normalize(file.FullPath);
+            if (seenCommand is not null)
+            {
+                seenPath!.Value = pathParameter.Value;
+                seenCommand.ExecuteNonQuery();
+            }
             nameParameter.Value = file.Filename;
             extensionParameter.Value = file.Extension;
             sizeParameter.Value = file.Size;
@@ -248,6 +294,9 @@ public sealed class FileMetadataStore
             searchCommand.ExecuteNonQuery();
         }
 
+        var removed = completeRoots is { Length: > 0 }
+            ? RemoveMissingFiles(connection, transaction, completeRoots, cancellationToken)
+            : 0;
         using var countCommand = connection.CreateCommand();
         countCommand.Transaction = transaction;
         countCommand.CommandText = "SELECT COUNT(*) FROM file_metadata;";
@@ -257,9 +306,46 @@ public sealed class FileMetadataStore
         progress?.Report(new TextIndexProgress(processed, extracted));
         cancellationToken.ThrowIfCancellationRequested();
         transaction.Commit();
-        Trace.TraceInformation("Metadata batch committed; {0} files stored in total.", count);
-        return new TextIndexResult(count, textCount, extracted, skipped);
+        Trace.TraceInformation("Metadata batch committed; {0} files stored in total; {1} stale index entries removed.", count, removed);
+        return new TextIndexResult(count, textCount, extracted, skipped, removed, cleanupSkippedFolders);
     }
+
+    private static int RemoveMissingFiles(SqliteConnection connection, SqliteTransaction transaction,
+        string[] completeRoots, CancellationToken cancellationToken)
+    {
+        const string missingFiles = """
+            SELECT m.id FROM file_metadata AS m
+            WHERE instr(m.full_path, $folder) = 1
+                AND NOT EXISTS (SELECT 1 FROM scan_seen_paths AS s WHERE s.full_path = m.full_path)
+            """;
+        using var searchCommand = connection.CreateCommand();
+        searchCommand.Transaction = transaction;
+        searchCommand.CommandText = $"DELETE FROM file_search WHERE rowid IN ({missingFiles});";
+        var searchFolder = searchCommand.Parameters.Add("$folder", SqliteType.Text);
+        searchCommand.Prepare();
+        using var metadataCommand = connection.CreateCommand();
+        metadataCommand.Transaction = transaction;
+        metadataCommand.CommandText = $"DELETE FROM file_metadata WHERE id IN ({missingFiles});";
+        var metadataFolder = metadataCommand.Parameters.Add("$folder", SqliteType.Text);
+        metadataCommand.Prepare();
+        var removed = 0;
+        foreach (var root in completeRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            searchFolder.Value = metadataFolder.Value = FolderPrefix(root);
+            searchCommand.ExecuteNonQuery();
+            // Foreign keys remove file_text in the same transaction as metadata and FTS entries.
+            removed += metadataCommand.ExecuteNonQuery();
+        }
+        return removed;
+    }
+
+    private static bool IsWithinFolder(string path, string folder) =>
+        path.StartsWith(FolderPrefix(folder), StringComparison.Ordinal);
+
+    private static string FolderPrefix(string folder) => Path.EndsInDirectorySeparator(folder)
+        ? folder
+        : folder + Path.DirectorySeparatorChar;
 
     public Task<long> GetFileCountAsync(CancellationToken cancellationToken = default)
     {
