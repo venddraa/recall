@@ -47,6 +47,7 @@
                      Grid.Column="1"
                      PlaceholderText="Enter words you remember from a file"
                      AutomationProperties.Name="Search files"
+                     ToolTip.Tip="Ctrl+F: focus search. Down: focus search results."
                      TextChanged="SearchBox_OnTextChanged"
                      KeyDown="SearchBox_OnKeyDown" />
             <Button x:Name="FindButton" Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
@@ -76,6 +77,8 @@
                     <ListBox x:Name="ResultsList" Grid.Row="1" BorderThickness="0"
                              SelectionChanged="ResultsList_OnSelectionChanged"
                              DoubleTapped="ResultsList_OnDoubleTapped"
+                             KeyDown="ResultsList_OnKeyDown"
+                             ContextRequested="ResultsList_OnContextRequested"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="Search results">
                         <ListBox.Styles>

@@ -35,12 +35,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        AddHandler(KeyDownEvent, MainWindow_OnShortcutKeyDown, RoutingStrategies.Tunnel);
         Opened += MainWindow_OnOpened;
         Closed += async (_, _) =>
         {
             _lifetime.Cancel();
             _scanCancellation?.Cancel();
             CancelSearch();
+            CloseResultContextMenu();
             await StopMonitoringAsync();
         };
     }
@@ -363,6 +365,10 @@ public partial class MainWindow : Window
             e.Handled = true;
             await RunSearchAsync();
         }
+        else if (e.Key == Key.Down && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = FocusSearchResults();
+        }
     }
 
     private void SearchBox_OnTextChanged(object? sender, TextChangedEventArgs e)
@@ -460,6 +466,7 @@ public partial class MainWindow : Window
 
     private void ResetSearchView(string title, string description)
     {
+        CloseResultContextMenu();
         CancelSearch();
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
         UpdateFileActionMenus();
@@ -492,7 +499,13 @@ public partial class MainWindow : Window
 
     private async void CopyPath_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_copyingPath || this.FindControl<ListBox>("ResultsList")!.SelectedItem is not SearchResultRow row)
+        if (this.FindControl<ListBox>("ResultsList")!.SelectedItem is SearchResultRow row)
+            await CopyPathAsync(row);
+    }
+
+    private async Task CopyPathAsync(SearchResultRow row)
+    {
+        if (_copyingPath)
             return;
         _copyingPath = true;
         UpdateFileActionMenus();
@@ -525,7 +538,13 @@ public partial class MainWindow : Window
 
     private async void OpenFolder_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_openingFolder || this.FindControl<ListBox>("ResultsList")!.SelectedItem is not SearchResultRow row)
+        if (this.FindControl<ListBox>("ResultsList")!.SelectedItem is SearchResultRow row)
+            await OpenFolderAsync(row);
+    }
+
+    private async Task OpenFolderAsync(SearchResultRow row)
+    {
+        if (_openingFolder)
             return;
         _openingFolder = true;
         UpdateFileActionMenus();
