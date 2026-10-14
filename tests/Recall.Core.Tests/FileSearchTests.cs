@@ -138,7 +138,8 @@ public sealed class FileSearchTests : IDisposable
         await store.IndexScanAsync([broken], new PlainTextExtractor(1024), cancellationToken: Token);
 
         Assert.Empty(await store.SearchAsync("obsolete", cancellationToken: Token));
-        Assert.Single(await store.SearchAsync("notes", cancellationToken: Token));
+        Assert.Equal(TextExtractionStatus.InvalidEncoding,
+            Assert.Single(await store.SearchAsync("notes", cancellationToken: Token)).ExtractionStatus);
     }
 
     [Fact]
@@ -238,7 +239,9 @@ public sealed class FileSearchTests : IDisposable
         await store.InitializeAsync(Token);
         var file = await WriteFile("unique-report.pdf", "private unsupported content");
         await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
-        Assert.Equal("", Assert.Single(await store.SearchAsync("unique report", cancellationToken: Token)).Snippet);
+        var result = Assert.Single(await store.SearchAsync("unique report", cancellationToken: Token));
+        Assert.Equal("", result.Snippet);
+        Assert.Equal(TextExtractionStatus.Unsupported, result.ExtractionStatus);
     }
 
     [Fact]
@@ -286,6 +289,103 @@ public sealed class FileSearchTests : IDisposable
         var result = Assert.Single(await store.SearchFoldersAsync("remembered content",
             [Path.GetDirectoryName(file.FullPath)!], cancellationToken: Token));
         Assert.Contains("remembered content 123", result.Snippet);
+        Assert.Equal(TextExtractionStatus.Extracted, result.ExtractionStatus);
+    }
+
+    [Fact]
+    public async Task MetadataOnlyResultRemainsSearchableWithoutAnExtractionStatus()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("pending-report.txt", "content not indexed yet");
+        await store.SaveScanAsync([file], Token);
+
+        var result = Assert.Single(await store.SearchAsync("pending report", cancellationToken: Token));
+
+        Assert.Equal(file.FullPath, result.FullPath);
+        Assert.Null(result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
+    }
+
+    [Fact]
+    public async Task EachResultKeepsItsStoredStatusAfterRestartWithoutReadingOriginalFiles()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var unsupported = await WriteFile("report-unsupported.zip", "unsupported");
+        var large = await WriteFile("report-large.txt", new string('x', 64));
+        var ready = await WriteFile("report-ready.txt", "remembered");
+        await store.IndexScanAsync([unsupported, large, ready], new PlainTextExtractor(16), cancellationToken: Token);
+        File.Delete(unsupported.FullPath);
+        File.Delete(large.FullPath);
+        File.Delete(ready.FullPath);
+
+        var results = await CreateStore().SearchFoldersAsync("report", [Path.GetDirectoryName(ready.FullPath)!],
+            cancellationToken: Token);
+        var byPath = results.ToDictionary(result => result.FullPath);
+
+        Assert.Equal(3, results.Count);
+        Assert.Equal(TextExtractionStatus.Unsupported, byPath[unsupported.FullPath].ExtractionStatus);
+        Assert.Equal(TextExtractionStatus.TooLarge, byPath[large.FullPath].ExtractionStatus);
+        Assert.Equal(TextExtractionStatus.Extracted, byPath[ready.FullPath].ExtractionStatus);
+        Assert.Equal("remembered", byPath[ready.FullPath].Snippet);
+    }
+
+    [Theory]
+    [InlineData("FutureStatus")]
+    [InlineData("999")]
+    [InlineData("0")]
+    public async Task UnknownStoredStatusDoesNotHideTheFilenameMatch(string savedStatus)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("unknown-report.zip", "unsupported");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+        using (var connection = new SqliteConnection($"Data Source={store.DatabasePath};Pooling=False"))
+        {
+            await connection.OpenAsync(Token);
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE file_text SET status = $status;";
+            command.Parameters.AddWithValue("$status", savedStatus);
+            await command.ExecuteNonQueryAsync(Token);
+        }
+
+        var result = Assert.Single(await store.SearchAsync("unknown report", cancellationToken: Token));
+
+        Assert.Equal(file.FullPath, result.FullPath);
+        Assert.Null(result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
+    }
+
+    [Fact]
+    public async Task SuccessfulRetryReplacesThePreviousFailureStatusAndRestoresPreview()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("recoverable.txt", "remembered text");
+        await store.IndexScanAsync([file], new PlainTextExtractor(4), cancellationToken: Token);
+        Assert.Equal(TextExtractionStatus.TooLarge,
+            Assert.Single(await store.SearchAsync("recoverable", cancellationToken: Token)).ExtractionStatus);
+
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync("remembered", cancellationToken: Token));
+        Assert.Equal(TextExtractionStatus.Extracted, result.ExtractionStatus);
+        Assert.Contains("remembered text", result.Snippet);
+    }
+
+    [Fact]
+    public async Task EmptyTextFileIsDistinguishedFromUnsupportedOrUnprocessedFiles()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("empty-report.txt", "");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync("empty report", cancellationToken: Token));
+
+        Assert.Equal(TextExtractionStatus.Extracted, result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
     }
 
     [Fact]

@@ -48,6 +48,7 @@ public sealed class PdfTextExtractorTests : IDisposable
         Assert.Equal(1, indexed.ExtractedFiles);
         Assert.Equal(file.FullPath, result.FullPath);
         Assert.Contains("clear sky index", result.Snippet, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(TextExtractionStatus.Extracted, result.ExtractionStatus);
     }
 
     [Fact]
@@ -61,7 +62,10 @@ public sealed class PdfTextExtractorTests : IDisposable
             cancellationToken: Token);
 
         Assert.Equal(1, indexed.SkippedFiles[TextExtractionStatus.NoSearchableText]);
-        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync("scanned report", cancellationToken: Token)).FullPath);
+        var result = Assert.Single(await store.SearchAsync("scanned report", cancellationToken: Token));
+        Assert.Equal(file.FullPath, result.FullPath);
+        Assert.Equal(TextExtractionStatus.NoSearchableText, result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
         Assert.Empty(await store.SearchAsync("clear sky", cancellationToken: Token));
     }
 
@@ -79,6 +83,9 @@ public sealed class PdfTextExtractorTests : IDisposable
             new FileTextExtractor(1024, 1024 * 1024, 1024), cancellationToken: Token);
 
         Assert.Equal(1, indexed.SkippedFiles[TextExtractionStatus.ParserFailed]);
+        var failed = Assert.Single(await store.SearchAsync("broken", cancellationToken: Token));
+        Assert.Equal(TextExtractionStatus.ParserFailed, failed.ExtractionStatus);
+        Assert.Empty(failed.Snippet);
         Assert.Equal(good.FullPath, Assert.Single(await store.SearchAsync("remember this", cancellationToken: Token)).FullPath);
     }
 
@@ -93,7 +100,9 @@ public sealed class PdfTextExtractorTests : IDisposable
             cancellationToken: Token);
 
         Assert.Equal(1, indexed.SkippedFiles[TextExtractionStatus.TooLarge]);
-        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync("large report", cancellationToken: Token)).FullPath);
+        var result = Assert.Single(await store.SearchAsync("large report", cancellationToken: Token));
+        Assert.Equal(file.FullPath, result.FullPath);
+        Assert.Equal(TextExtractionStatus.TooLarge, result.ExtractionStatus);
         Assert.Empty(await store.SearchAsync("searchable text", cancellationToken: Token));
     }
 

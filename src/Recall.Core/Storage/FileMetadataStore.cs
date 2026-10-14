@@ -472,9 +472,10 @@ public sealed class FileMetadataStore
             command.CommandText = """
                 SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
                     bm25(file_search, 10.0, 1.0) AS rank,
-                    snippet(file_search, 1, '', '', ' … ', 32)
+                    snippet(file_search, 1, '', '', ' … ', 32), t.status
                 FROM file_search
                 JOIN file_metadata AS m ON m.id = file_search.rowid
+                LEFT JOIN file_text AS t ON t.file_id = m.id
                 WHERE file_search MATCH $query
                 ORDER BY rank, m.filename COLLATE NOCASE, m.full_path
                 LIMIT $limit;
@@ -505,9 +506,13 @@ public sealed class FileMetadataStore
                 while (reader.Read())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    var savedStatus = reader.IsDBNull(8) ? null : reader.GetString(8);
+                    // Missing or unrecognized status must not hide an otherwise valid filename match.
+                    TextExtractionStatus? extractionStatus = Enum.TryParse<TextExtractionStatus>(savedStatus, out var parsedStatus)
+                        && Enum.GetName(parsedStatus) == savedStatus ? parsedStatus : null;
                     results.Add(new SearchResult(
                         reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6), reader.GetString(7)));
+                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6), reader.GetString(7), extractionStatus));
                 }
                 cancellationToken.ThrowIfCancellationRequested();
             }

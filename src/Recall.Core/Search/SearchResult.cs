@@ -1,3 +1,5 @@
+using Recall.Core.Extraction;
+
 namespace Recall.Core.Search;
 
 public sealed record SearchResult(
@@ -8,4 +10,5 @@ public sealed record SearchResult(
     long Size,
     DateTime ModifiedAtUtc,
     double Rank,
-    string Snippet = "");
+    string Snippet = "",
+    TextExtractionStatus? ExtractionStatus = null);
