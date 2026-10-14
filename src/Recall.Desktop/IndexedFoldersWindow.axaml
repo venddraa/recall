@@ -23,12 +23,15 @@
             <Button x:Name="AddFolderButton" Content="Add Folder..." Click="AddFolder_OnClick" />
             <Button x:Name="RemoveFolderButton" Content="Remove Folder" IsEnabled="False"
                     Click="RemoveFolder_OnClick" />
-            <Button Content="Reindex Folder" IsEnabled="False" />
+            <Button x:Name="ReindexFolderButton" Content="Reindex Folder" IsEnabled="False"
+                    Click="ReindexFolder_OnClick" />
         </StackPanel>
 
         <StackPanel Grid.Row="3" Spacing="6" Margin="0,10,0,10">
             <TextBlock x:Name="MessageText" IsVisible="False" TextWrapping="Wrap" />
             <TextBlock Text="Changes are saved immediately. Removing a folder does not delete its files."
+                       Foreground="#606060" TextWrapping="Wrap" />
+            <TextBlock Text="Reindex Folder closes this dialog and rereads all supported file contents in the selected folder."
                        Foreground="#606060" TextWrapping="Wrap" />
         </StackPanel>
 

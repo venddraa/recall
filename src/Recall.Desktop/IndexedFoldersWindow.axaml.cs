@@ -14,6 +14,7 @@ public partial class IndexedFoldersWindow : Window
     private FolderConfigurationStore? _store;
     private readonly ObservableCollection<string> _folders = new();
     private bool _busy;
+    private bool _canReindex;
 
     public IndexedFoldersWindow()
     {
@@ -23,9 +24,11 @@ public partial class IndexedFoldersWindow : Window
         RefreshControls();
     }
 
-    public IndexedFoldersWindow(FolderConfigurationStore store, IReadOnlyList<string> folders) : this()
+    public IndexedFoldersWindow(FolderConfigurationStore store, IReadOnlyList<string> folders,
+        bool canReindex = false) : this()
     {
         _store = store;
+        _canReindex = canReindex;
         foreach (var folder in folders)
         {
             _folders.Add(folder);
@@ -35,6 +38,15 @@ public partial class IndexedFoldersWindow : Window
     }
 
     public IReadOnlyList<string> Folders => _folders.ToArray();
+    public string? RequestedReindexFolder { get; private set; }
+
+    private void ReindexFolder_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || !_canReindex || this.FindControl<ListBox>("FoldersList")!.SelectedItem is not string folder)
+            return;
+        RequestedReindexFolder = folder;
+        Close();
+    }
 
     private async void AddFolder_OnClick(object? sender, RoutedEventArgs e)
     {
@@ -155,6 +167,8 @@ public partial class IndexedFoldersWindow : Window
     {
         this.FindControl<Button>("AddFolderButton")!.IsEnabled = !_busy && _store is not null;
         this.FindControl<Button>("RemoveFolderButton")!.IsEnabled = !_busy && _store is not null
+            && this.FindControl<ListBox>("FoldersList")!.SelectedItem is string;
+        this.FindControl<Button>("ReindexFolderButton")!.IsEnabled = !_busy && _canReindex
             && this.FindControl<ListBox>("FoldersList")!.SelectedItem is string;
         this.FindControl<Button>("CloseButton")!.IsEnabled = !_busy;
         this.FindControl<TextBlock>("EmptyFoldersText")!.IsVisible = _folders.Count == 0;

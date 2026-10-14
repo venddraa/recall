@@ -123,7 +123,7 @@ public sealed class FileMetadataStore
     // Requires a complete scan of the supplied roots. Partial updates must use IndexScanAsync instead.
     public Task<TextIndexResult> SynchronizeScanAsync(ScanResult scan, IEnumerable<string> selectedFolders,
         ITextExtractor extractor, IProgress<TextIndexProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool forceTextExtraction = false)
     {
         ArgumentNullException.ThrowIfNull(scan);
         ArgumentNullException.ThrowIfNull(selectedFolders);
@@ -145,7 +145,7 @@ public sealed class FileMetadataStore
             var completeRoots = roots.Where(root => !failures.Any(path => path == root || IsWithinFolder(path, root)))
                 .ToArray();
             return SaveBatch(files, extractor, progress, cancellationToken, completeRoots,
-                roots.Length - completeRoots.Length);
+                roots.Length - completeRoots.Length, forceTextExtraction: forceTextExtraction);
         }, cancellationToken);
     }
 
@@ -166,7 +166,7 @@ public sealed class FileMetadataStore
     private TextIndexResult SaveBatch(IEnumerable<ScannedFile> files, ITextExtractor? extractor,
         IProgress<TextIndexProgress>? progress, CancellationToken cancellationToken,
         string[]? completeRoots = null, int cleanupSkippedFolders = 0, string[]? removedPaths = null,
-        string[]? removedDescendants = null)
+        string[]? removedDescendants = null, bool forceTextExtraction = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Trace.TraceInformation("Saving scanned file metadata.");
@@ -276,7 +276,7 @@ public sealed class FileMetadataStore
             reusePath.Value = invalidatePath.Value = pathParameter.Value;
             reuseSize.Value = invalidateSize.Value = sizeParameter.Value;
             reuseModified.Value = invalidateModified.Value = modifiedParameter.Value;
-            var reuse = extractor is not null
+            var reuse = !forceTextExtraction && extractor is not null
                 && Convert.ToInt64(reuseCommand.ExecuteScalar(), CultureInfo.InvariantCulture) > 0
                 && extractor.CanReuse(file);
             invalidateCommand.ExecuteNonQuery();

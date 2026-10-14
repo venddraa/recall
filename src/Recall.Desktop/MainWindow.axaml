@@ -30,7 +30,6 @@
                               IsEnabled="False" Click="ScanFolders_OnClick" />
                     <MenuItem x:Name="CancelScanMenuItem" Header="Cancel Scan"
                               IsEnabled="False" Click="CancelScan_OnClick" />
-                    <MenuItem Header="Reindex" IsEnabled="False" />
                 </MenuItem>
                 <MenuItem Header="_Tools">
                     <MenuItem x:Name="SettingsMenuItem" Header="Settings..." IsEnabled="False"

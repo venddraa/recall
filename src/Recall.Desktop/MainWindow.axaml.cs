@@ -125,15 +125,17 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = false;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = false;
         this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = false;
+        string? reindexFolder = null;
         try
         {
             // Stop before selection changes so removed folders cannot continue being indexed.
             await StopMonitoringAsync();
             if (!IsVisible)
                 return;
-            var dialog = new IndexedFoldersWindow(_folderStore, _folders);
+            var dialog = new IndexedFoldersWindow(_folderStore, _folders, canReindex: _databaseReady);
             await dialog.ShowDialog(this);
             _folders = dialog.Folders;
+            reindexFolder = dialog.RequestedReindexFolder;
             await RestartMonitoringAsync();
             if (IsVisible)
             {
@@ -149,6 +151,8 @@ public partial class MainWindow : Window
                 this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = _settingsStore is not null;
             }
         }
+        if (reindexFolder is not null && IsVisible)
+            await ScanFoldersAsync([reindexFolder], forceTextExtraction: true);
     }
 
     private void UpdateFolderStatus()
@@ -177,22 +181,29 @@ public partial class MainWindow : Window
         UpdateFindButton();
     }
 
-    private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e)
+    private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e) => await ScanFoldersAsync(_folders);
+
+    private async Task ScanFoldersAsync(IReadOnlyList<string> scanFolders, bool forceTextExtraction = false)
     {
         var metadataStore = _metadataStore;
-        if (_scanCancellation is not null || _editingSettings || _folders.Count == 0 || !_databaseReady || metadataStore is null)
+        var roots = scanFolders.ToArray();
+        if (_scanCancellation is not null || _editingSettings || roots.Length == 0 || !_databaseReady || metadataStore is null
+            || roots.Any(root => !_folders.Contains(root, StringComparer.Ordinal)))
         {
             return;
         }
 
         using var cancellation = new CancellationTokenSource();
+        var operation = forceTextExtraction ? "Reindex" : "Scan";
         _scanCancellation = cancellation;
-        ResetSearchView("Scanning selected folders...", "You can choose Index → Cancel Scan.");
+        ResetSearchView(forceTextExtraction ? "Reindexing selected folder..." : "Scanning selected folders...",
+            "You can choose Index → Cancel Scan.");
         SetScanningControls(true);
-        this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Scanning selected folders...";
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-            "You can keep using Recall or choose Index → Cancel Scan.";
-        this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Starting";
+            forceTextExtraction
+                ? $"{roots[0]}\nAll supported file contents will be reread. Choose Index → Cancel Scan to stop."
+                : "You can choose Index → Cancel Scan.";
+        this.FindControl<TextBlock>("IndexStatusText")!.Text = $"{operation}: Starting";
 
         var savingMetadata = false;
         var scanSaved = false;
@@ -205,20 +216,20 @@ public partial class MainWindow : Window
                 return;
             }
 
-            this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Scan: {value.FileCount:N0} files";
+            this.FindControl<TextBlock>("IndexStatusText")!.Text = $"{operation}: {value.FileCount:N0} files";
         });
 
         try
         {
             using var automaticPause = await PauseAutomaticUpdatesAsync(cancellation.Token);
-            var result = await new FileScanner().ScanAsync(_folders, progress, cancellation.Token,
+            var result = await new FileScanner().ScanAsync(roots, progress, cancellation.Token,
                 excludedFolders: IndexExclusions());
             savingMetadata = true;
             if (IsVisible)
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving file text...";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Choose Index → Cancel Scan to stop without saving this scan.";
+                    $"Choose Index → Cancel Scan to stop without saving this {operation.ToLowerInvariant()}.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text: 0 / {result.Files.Count:N0} files";
             }
 
@@ -231,18 +242,20 @@ public partial class MainWindow : Window
                         $"Text: {value.ProcessedFiles:N0} / {result.Files.Count:N0} files";
                 }
             });
-            var saved = await metadataStore.SynchronizeScanAsync(result, _folders,
+            var saved = await metadataStore.SynchronizeScanAsync(result, roots,
                 new FileTextExtractor(MaximumTextFileBytes, MaximumDocumentFileBytes, MaximumDocumentTextCharacters),
-                textProgress, cancellation.Token);
+                textProgress, cancellation.Token, forceTextExtraction);
             _storedFileCount = saved.StoredFiles;
             _textFileCount = saved.StoredTextFiles;
             scanSaved = true;
             if (IsVisible)
             {
                 this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"Scan saved: {result.Files.Count:N0} files";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"{operation} saved: {result.Files.Count:N0} files";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n"
+                    (forceTextExtraction
+                        ? $"Text reread: {saved.ExtractedFiles:N0} files.\n"
+                        : $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n")
                     + FormatSkippedContent(saved)
                     + $"\nStale index entries removed: {saved.RemovedFiles:N0}; cleanup skipped for {saved.CleanupSkippedFolders:N0} folders with scan errors."
                     + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
@@ -252,13 +265,16 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            Trace.TraceInformation("File scan cancelled.");
+            Trace.TraceInformation("File {0} cancelled.", operation.ToLowerInvariant());
             if (IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Scan cancelled";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"{operation} cancelled";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Metadata and text from this scan were not saved. Choose Index → Scan Folders to start again.";
-                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Cancelled";
+                    $"Metadata and text from this {operation.ToLowerInvariant()} were not saved. "
+                    + (forceTextExtraction
+                        ? "Choose Index → Indexed Folders → Reindex Folder to start again."
+                        : "Choose Index → Scan Folders to start again.");
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = $"{operation}: Cancelled";
             }
         }
         catch (SqliteException exception) when (exception.SqliteErrorCode is 5 or 6)
@@ -268,7 +284,7 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "The metadata database is busy";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Metadata from this scan was not saved. Try scanning again after other database operations finish.";
+                    $"Metadata from this {operation.ToLowerInvariant()} was not saved. Try again after other database operations finish.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Busy";
             }
         }
@@ -279,10 +295,10 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = savingMetadata
                     ? "Could not save file metadata"
-                    : "Could not complete the scan";
+                    : $"Could not complete the {operation.ToLowerInvariant()}";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Metadata from this scan was not saved. Check the selected folders and database, then try again.";
-                this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Failed";
+                    $"Metadata from this {operation.ToLowerInvariant()} was not saved. Check the selected folders and database, then try again.";
+                this.FindControl<TextBlock>("IndexStatusText")!.Text = $"{operation}: Failed";
             }
         }
         finally
