@@ -149,14 +149,31 @@ public sealed class FileMetadataStore
         }, cancellationToken);
     }
 
+    public Task<TextIndexResult> ApplyChangesAsync(IEnumerable<ScannedFile> files, IEnumerable<string> removedPaths,
+        IEnumerable<string> completeFolders, ITextExtractor extractor, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(removedPaths);
+        ArgumentNullException.ThrowIfNull(completeFolders);
+        ArgumentNullException.ThrowIfNull(extractor);
+        var removals = removedPaths.Select(FolderPath.Normalize).Distinct(StringComparer.Ordinal).ToArray();
+        var folders = completeFolders.Select(FolderPath.Normalize).Distinct(StringComparer.Ordinal).ToArray();
+        var snapshots = files.ToArray();
+        return Task.Run(() => SaveBatch(snapshots, extractor, null, cancellationToken, folders,
+            removedPaths: removals, removedDescendants: snapshots.Select(file => FolderPath.Normalize(file.FullPath)).ToArray()), cancellationToken);
+    }
+
     private TextIndexResult SaveBatch(IEnumerable<ScannedFile> files, ITextExtractor? extractor,
         IProgress<TextIndexProgress>? progress, CancellationToken cancellationToken,
-        string[]? completeRoots = null, int cleanupSkippedFolders = 0)
+        string[]? completeRoots = null, int cleanupSkippedFolders = 0, string[]? removedPaths = null,
+        string[]? removedDescendants = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Trace.TraceInformation("Saving scanned file metadata.");
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+        var removed = RemovePaths(connection, transaction, removedPaths ?? [], cancellationToken);
+        removed += RemovePaths(connection, transaction, removedDescendants ?? [], cancellationToken, descendantsOnly: true);
         using var seenCommand = completeRoots is { Length: > 0 } ? connection.CreateCommand() : null;
         SqliteParameter? seenPath = null;
         if (seenCommand is not null)
@@ -294,7 +311,7 @@ public sealed class FileMetadataStore
             searchCommand.ExecuteNonQuery();
         }
 
-        var removed = completeRoots is { Length: > 0 }
+        removed += completeRoots is { Length: > 0 }
             ? RemoveMissingFiles(connection, transaction, completeRoots, cancellationToken)
             : 0;
         using var countCommand = connection.CreateCommand();
@@ -315,27 +332,72 @@ public sealed class FileMetadataStore
     {
         const string missingFiles = """
             SELECT m.id FROM file_metadata AS m
-            WHERE instr(m.full_path, $folder) = 1
+            WHERE (m.full_path = $root OR (m.full_path >= $folder AND m.full_path < $upper))
                 AND NOT EXISTS (SELECT 1 FROM scan_seen_paths AS s WHERE s.full_path = m.full_path)
             """;
         using var searchCommand = connection.CreateCommand();
         searchCommand.Transaction = transaction;
         searchCommand.CommandText = $"DELETE FROM file_search WHERE rowid IN ({missingFiles});";
         var searchFolder = searchCommand.Parameters.Add("$folder", SqliteType.Text);
+        var searchRoot = searchCommand.Parameters.Add("$root", SqliteType.Text);
+        var searchUpper = searchCommand.Parameters.Add("$upper", SqliteType.Text);
         searchCommand.Prepare();
         using var metadataCommand = connection.CreateCommand();
         metadataCommand.Transaction = transaction;
         metadataCommand.CommandText = $"DELETE FROM file_metadata WHERE id IN ({missingFiles});";
         var metadataFolder = metadataCommand.Parameters.Add("$folder", SqliteType.Text);
+        var metadataRoot = metadataCommand.Parameters.Add("$root", SqliteType.Text);
+        var metadataUpper = metadataCommand.Parameters.Add("$upper", SqliteType.Text);
         metadataCommand.Prepare();
         var removed = 0;
         foreach (var root in completeRoots)
         {
             cancellationToken.ThrowIfCancellationRequested();
             searchFolder.Value = metadataFolder.Value = FolderPrefix(root);
+            searchRoot.Value = metadataRoot.Value = root;
+            searchUpper.Value = metadataUpper.Value = PrefixUpperBound(FolderPrefix(root));
             searchCommand.ExecuteNonQuery();
             // Foreign keys remove file_text in the same transaction as metadata and FTS entries.
             removed += metadataCommand.ExecuteNonQuery();
+        }
+        return removed;
+    }
+
+    private static int RemovePaths(SqliteConnection connection, SqliteTransaction transaction,
+        string[] paths, CancellationToken cancellationToken, bool descendantsOnly = false)
+    {
+        if (paths.Length == 0)
+            return 0;
+        var ids = "SELECT id FROM file_metadata WHERE "
+            + (descendantsOnly ? "" : "full_path = $path OR ")
+            + "(full_path >= $prefix AND full_path < $upper)";
+        using var search = connection.CreateCommand();
+        search.Transaction = transaction;
+        search.CommandText = $"DELETE FROM file_search WHERE rowid IN ({ids});";
+        using var metadata = connection.CreateCommand();
+        metadata.Transaction = transaction;
+        metadata.CommandText = $"DELETE FROM file_metadata WHERE id IN ({ids});";
+        foreach (var command in new[] { search, metadata })
+        {
+            if (!descendantsOnly)
+                command.Parameters.Add("$path", SqliteType.Text);
+            command.Parameters.Add("$prefix", SqliteType.Text);
+            command.Parameters.Add("$upper", SqliteType.Text);
+            command.Prepare();
+        }
+        var removed = 0;
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var command in new[] { search, metadata })
+            {
+                if (!descendantsOnly)
+                    command.Parameters["$path"].Value = path;
+                command.Parameters["$prefix"].Value = FolderPrefix(path);
+                command.Parameters["$upper"].Value = PrefixUpperBound(FolderPrefix(path));
+            }
+            search.ExecuteNonQuery();
+            removed += metadata.ExecuteNonQuery();
         }
         return removed;
     }
@@ -346,6 +408,10 @@ public sealed class FileMetadataStore
     private static string FolderPrefix(string folder) => Path.EndsInDirectorySeparator(folder)
         ? folder
         : folder + Path.DirectorySeparatorChar;
+
+    // A prefix ends in an ASCII directory separator. Incrementing it bounds all descendants
+    // without LIKE wildcards or scanning every row for each individual file event.
+    private static string PrefixUpperBound(string prefix) => prefix[..^1] + (char)(prefix[^1] + 1);
 
     public Task<long> GetFileCountAsync(CancellationToken cancellationToken = default)
     {

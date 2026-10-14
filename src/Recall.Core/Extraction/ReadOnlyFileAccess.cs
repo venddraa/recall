@@ -59,12 +59,27 @@ internal static class ReadOnlyFileAccess
         }
     }
 
+    internal static (uint DeviceMajor, uint DeviceMinor, ulong Inode)? DirectoryIdentity(string path)
+    {
+        if (!OperatingSystem.IsLinux())
+            return null;
+        // AT_FDCWD, AT_SYMLINK_NOFOLLOW, STATX_TYPE | STATX_INO. Layout is defined in linux/stat.h.
+        if (NativeMethods.Statx(-100, path, 0x100, 0x101, out var stat) != 0
+            || (stat.Mode & 0xf000) != 0x4000 || (stat.Mask & 0x100) == 0)
+            throw new IOException("Could not identify the monitored directory.");
+        return (stat.DeviceMajor, stat.DeviceMinor, stat.Inode);
+    }
+
     private static class NativeMethods
     {
         [StructLayout(LayoutKind.Explicit, Size = 256)]
         internal struct FileStat
         {
+            [FieldOffset(0)] internal uint Mask;
             [FieldOffset(28)] internal ushort Mode;
+            [FieldOffset(32)] internal ulong Inode;
+            [FieldOffset(136)] internal uint DeviceMajor;
+            [FieldOffset(140)] internal uint DeviceMinor;
         }
 
         [DllImport("libc", EntryPoint = "open", SetLastError = true)]

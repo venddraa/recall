@@ -2,6 +2,10 @@ namespace Recall.Core.Folders;
 
 public static class FolderPath
 {
+    public static bool ContainsPath(string folder, string path) => path == folder
+        || path.StartsWith(Path.EndsInDirectorySeparator(folder) ? folder : folder + Path.DirectorySeparatorChar,
+            StringComparison.Ordinal);
+
     public static string Normalize(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

@@ -36,10 +36,12 @@ public partial class MainWindow : Window
     {
         AvaloniaXamlLoader.Load(this);
         Opened += MainWindow_OnOpened;
-        Closed += (_, _) =>
+        Closed += async (_, _) =>
         {
+            _lifetime.Cancel();
             _scanCancellation?.Cancel();
             CancelSearch();
+            await StopMonitoringAsync();
         };
     }
 
@@ -52,10 +54,10 @@ public partial class MainWindow : Window
                 Environment.GetEnvironmentVariable("XDG_CONFIG_HOME"),
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
             _folderStore = new FolderConfigurationStore(configPath);
-            _folders = await Task.Run(() => _folderStore.LoadAsync());
+            _folders = await Task.Run(() => _folderStore.LoadAsync(_lifetime.Token));
             UpdateFolderStatus();
-            this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = true;
         }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
         catch (Exception exception)
         {
             Trace.TraceError("Could not load folder configuration: {0}", exception);
@@ -79,15 +81,17 @@ public partial class MainWindow : Window
                 Environment.GetEnvironmentVariable("XDG_DATA_HOME"),
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
             _metadataStore = new FileMetadataStore(databasePath);
-            await _metadataStore.InitializeAsync();
-            _storedFileCount = await _metadataStore.GetFileCountAsync();
-            _textFileCount = await _metadataStore.GetTextFileCountAsync();
+            await _metadataStore.InitializeAsync(_lifetime.Token);
+            _storedFileCount = await _metadataStore.GetFileCountAsync(_lifetime.Token);
+            _textFileCount = await _metadataStore.GetTextFileCountAsync(_lifetime.Token);
             _databaseReady = true;
+            await RestartMonitoringAsync();
             if (IsVisible)
             {
                 UpdateFolderStatus();
             }
         }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
         catch (Exception exception)
         {
             Trace.TraceError("Could not open the metadata database: {0}", exception);
@@ -100,6 +104,11 @@ public partial class MainWindow : Window
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Database: Error";
             }
         }
+        finally
+        {
+            if (IsVisible)
+                this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = true;
+        }
     }
 
     private async void IndexedFolders_OnClick(object? sender, RoutedEventArgs e)
@@ -109,10 +118,29 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new IndexedFoldersWindow(_folderStore, _folders);
-        await dialog.ShowDialog(this);
-        _folders = dialog.Folders;
-        UpdateFolderStatus();
+        this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = false;
+        this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = false;
+        try
+        {
+            // Stop before selection changes so removed folders cannot continue being indexed.
+            await StopMonitoringAsync();
+            if (!IsVisible)
+                return;
+            var dialog = new IndexedFoldersWindow(_folderStore, _folders);
+            await dialog.ShowDialog(this);
+            _folders = dialog.Folders;
+            await RestartMonitoringAsync();
+            if (IsVisible)
+            {
+                UpdateFolderStatus();
+                ResetSearchView("Folder settings updated", "Choose Index → Scan Folders to reconcile existing files and changes made while folder settings were open.");
+            }
+        }
+        finally
+        {
+            if (IsVisible)
+                this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = true;
+        }
     }
 
     private void UpdateFolderStatus()
@@ -129,11 +157,13 @@ public partial class MainWindow : Window
         this.FindControl<TextBlock>("IndexStatusText")!.Text = hasFolders
             ? $"Text files: {_textFileCount:N0}"
             : "Index: Not configured";
+        if (hasFolders)
+            UpdateMonitoringStatus();
         ResetSearchView(hasFolders
             ? (_storedFileCount > 0 ? "Ready to search" : "No metadata saved yet")
             : "No folders selected", hasFolders
             ? (_storedFileCount > 0
-                ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched."
+                ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
                 : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
         UpdateFindButton();
@@ -157,6 +187,7 @@ public partial class MainWindow : Window
         this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Starting";
 
         var savingMetadata = false;
+        var scanSaved = false;
         var progress = new Progress<ScanProgress>(value =>
         {
             // Ignore updates queued by a completed, cancelled, or previous scan.
@@ -171,7 +202,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await new FileScanner().ScanAsync(_folders, progress, cancellation.Token);
+            using var automaticPause = await PauseAutomaticUpdatesAsync(cancellation.Token);
+            var result = await new FileScanner().ScanAsync(_folders, progress, cancellation.Token,
+                excludedFolders: IndexExclusions());
             savingMetadata = true;
             if (IsVisible)
             {
@@ -195,6 +228,7 @@ public partial class MainWindow : Window
                 textProgress, cancellation.Token);
             _storedFileCount = saved.StoredFiles;
             _textFileCount = saved.StoredTextFiles;
+            scanSaved = true;
             if (IsVisible)
             {
                 this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
@@ -249,6 +283,8 @@ public partial class MainWindow : Window
             if (IsVisible)
             {
                 SetScanningControls(false);
+                if (scanSaved || _monitor?.FailureReason is not null || _monitorProblem is not null)
+                    UpdateMonitoringStatus();
             }
         }
     }

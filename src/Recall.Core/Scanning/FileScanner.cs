@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security;
 using Recall.Core.Folders;
+using Recall.Core.Extraction;
 
 namespace Recall.Core.Scanning;
 
@@ -17,17 +18,20 @@ public sealed class FileScanner
     public Task<ScanResult> ScanAsync(
         IEnumerable<string> selectedFolders,
         IProgress<ScanProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IEnumerable<string>? excludedFolders = null)
     {
         ArgumentNullException.ThrowIfNull(selectedFolders);
         var roots = selectedFolders.Select(FolderPath.Normalize)
             .Distinct(StringComparer.Ordinal).ToArray();
 
-        return Task.Run(() => Scan(roots, progress, cancellationToken), cancellationToken);
+        var exclusions = excludedFolders?.Select(FolderPath.Normalize).ToArray() ?? [];
+        return Task.Run(() => Scan(roots, exclusions, progress, cancellationToken), cancellationToken);
     }
 
     private static ScanResult Scan(
         string[] roots,
+        string[] exclusions,
         IProgress<ScanProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -58,7 +62,8 @@ public sealed class FileScanner
         while (pendingDirectories.TryPop(out var directoryPath))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!visitedDirectories.Add(directoryPath))
+            if (exclusions.Any(folder => FolderPath.ContainsPath(folder, directoryPath))
+                || !visitedDirectories.Add(directoryPath))
             {
                 continue;
             }
@@ -71,7 +76,7 @@ public sealed class FileScanner
                     throw new DirectoryNotFoundException("The selected directory is unavailable.");
                 }
 
-                if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                if (ReadOnlyFileAccess.HasSymbolicLink(directoryPath))
                 {
                     skippedLinks++;
                     ReportProgress();
@@ -81,6 +86,8 @@ public sealed class FileScanner
                 foreach (var entry in directory.EnumerateFileSystemInfos("*", EnumerationOptions))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (exclusions.Any(folder => FolderPath.ContainsPath(folder, entry.FullName)))
+                        continue;
                     try
                     {
                         entry.Refresh();
