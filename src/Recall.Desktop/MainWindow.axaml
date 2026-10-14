@@ -33,7 +33,8 @@
                     <MenuItem Header="Reindex" IsEnabled="False" />
                 </MenuItem>
                 <MenuItem Header="_Tools">
-                    <MenuItem Header="Settings..." IsEnabled="False" />
+                    <MenuItem x:Name="SettingsMenuItem" Header="Settings..." IsEnabled="False"
+                              Click="Settings_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Help">
                     <MenuItem Header="_About Recall..." Click="About_OnClick" />

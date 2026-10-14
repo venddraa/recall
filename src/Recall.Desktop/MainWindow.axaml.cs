@@ -55,6 +55,7 @@ public partial class MainWindow : Window
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
             _folderStore = new FolderConfigurationStore(configPath);
             _folders = await Task.Run(() => _folderStore.LoadAsync(_lifetime.Token));
+            await LoadSettingsAsync();
             UpdateFolderStatus();
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
@@ -107,19 +108,23 @@ public partial class MainWindow : Window
         finally
         {
             if (IsVisible)
+            {
                 this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = true;
+                this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = _settingsStore is not null;
+            }
         }
     }
 
     private async void IndexedFolders_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_folderStore is null || _scanCancellation is not null)
+        if (_folderStore is null || _scanCancellation is not null || _editingSettings)
         {
             return;
         }
 
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = false;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = false;
+        this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = false;
         try
         {
             // Stop before selection changes so removed folders cannot continue being indexed.
@@ -139,7 +144,10 @@ public partial class MainWindow : Window
         finally
         {
             if (IsVisible)
+            {
                 this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = true;
+                this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = _settingsStore is not null;
+            }
         }
     }
 
@@ -172,7 +180,7 @@ public partial class MainWindow : Window
     private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e)
     {
         var metadataStore = _metadataStore;
-        if (_scanCancellation is not null || _folders.Count == 0 || !_databaseReady || metadataStore is null)
+        if (_scanCancellation is not null || _editingSettings || _folders.Count == 0 || !_databaseReady || metadataStore is null)
         {
             return;
         }
@@ -310,6 +318,7 @@ public partial class MainWindow : Window
     private void SetScanningControls(bool scanning)
     {
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = !scanning;
+        this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = !scanning && _settingsStore is not null;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
         this.FindControl<TextBox>("SearchBox")!.IsEnabled = !scanning;

@@ -37,7 +37,7 @@ public partial class MainWindow
     {
         await StopMonitoringAsync();
         _monitorProblem = null;
-        if (!_databaseReady || _folders.Count == 0 || !IsVisible || _lifetime.IsCancellationRequested)
+        if (!_settings.AutomaticUpdates || !_databaseReady || _folders.Count == 0 || !IsVisible || _lifetime.IsCancellationRequested)
             return;
         FolderMonitor? monitor = null;
         var progress = new Progress<FolderMonitorUpdate>(async update =>
@@ -96,13 +96,23 @@ public partial class MainWindow
     {
         if (!IsVisible || !_databaseReady)
             return;
-        this.FindControl<TextBlock>("IndexStatusText")!.Text = _monitorProblem is not null || _monitor?.FailureReason is not null
-            ? "Auto: stopped; use Scan Folders"
-            : (_monitor is not null ? $"Text files: {_textFileCount:N0} (watching)" : $"Text files: {_textFileCount:N0}");
+        var status = this.FindControl<TextBlock>("IndexStatusText")!;
+        if (_settingsProblem is not null)
+            status.Text = "Auto: settings error; use Settings";
+        else if (_folders.Count == 0)
+            status.Text = "Index: Not configured";
+        else if (!_settings.AutomaticUpdates)
+            status.Text = $"Text files: {_textFileCount:N0} (manual)";
+        else if (_monitorProblem is not null || _monitor?.FailureReason is not null)
+            status.Text = "Auto: stopped; use Scan Folders";
+        else
+            status.Text = _monitor is not null ? $"Text files: {_textFileCount:N0} (watching)" : $"Text files: {_textFileCount:N0}";
     }
 
     private async Task<IDisposable?> PauseAutomaticUpdatesAsync(CancellationToken cancellationToken)
     {
+        if (!_settings.AutomaticUpdates)
+            return null;
         if (_monitor is null || _monitor.FailureReason is not null)
             await RestartMonitoringAsync();
         var monitor = _monitor;
