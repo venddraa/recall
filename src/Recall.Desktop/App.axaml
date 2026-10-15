@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Recall.Desktop.App"
+             Name="Recall"
              RequestedThemeVariant="Light">
     <Application.Styles>
         <SimpleTheme />
