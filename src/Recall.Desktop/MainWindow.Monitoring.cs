@@ -66,7 +66,8 @@ public partial class MainWindow
                 or TextExtractionStatus.InvalidEncoding or TextExtractionStatus.Binary))
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Some updates skipped. Use Scan Folders to retry.";
             if (!string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
-                await RunSearchAsync();
+                // A watcher refresh must not bypass the delay while the user is typing.
+                await RunSearchAsync(debounce: true);
             else
                 ResetSearchView("Index updated", "Automatic updates are active while Recall is open.");
         });

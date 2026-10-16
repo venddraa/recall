@@ -47,7 +47,7 @@
                      Grid.Column="1"
                      PlaceholderText="Enter words you remember from a file"
                      AutomationProperties.Name="Search files"
-                     ToolTip.Tip="Ctrl+F: focus search. Down: focus search results."
+                     ToolTip.Tip="Search runs after you pause typing. Enter: search now. Ctrl+F: focus search. Down: focus results."
                      TextChanged="SearchBox_OnTextChanged"
                      KeyDown="SearchBox_OnKeyDown" />
             <Button x:Name="FindButton" Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"

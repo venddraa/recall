@@ -17,6 +17,7 @@ namespace Recall.Desktop;
 
 public partial class MainWindow : Window
 {
+    private const int SearchDebounceMilliseconds = 300;
     private const int MaximumTextFileBytes = 5 * 1024 * 1024;
     private const int MaximumDocumentFileBytes = 20 * 1024 * 1024;
     private const int MaximumDocumentTextCharacters = 5 * 1024 * 1024;
@@ -177,7 +178,7 @@ public partial class MainWindow : Window
             ? (_storedFileCount > 0 ? "Ready to search" : "No metadata saved yet")
             : "No folders selected", hasFolders
             ? (_storedFileCount > 0
-                ? "Enter words you remember, then click Find or press Enter.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
+                ? "Enter words you remember; results appear when you pause typing.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
                 : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
         UpdateFindButton();
@@ -261,7 +262,7 @@ public partial class MainWindow : Window
                     + FormatSkippedContent(saved)
                     + $"\nStale index entries removed: {saved.RemovedFiles:N0}; cleanup skipped for {saved.CleanupSkippedFolders:N0} folders with scan errors."
                     + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
-                    + "\nEnter words you remember, then click Find or press Enter.";
+                    + "\nEnter words you remember; results appear when you pause typing.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text files: {_textFileCount:N0} (complete)";
             }
         }
@@ -371,7 +372,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SearchBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    private async void SearchBox_OnTextChanged(object? sender, TextChangedEventArgs e)
     {
         // TextChanged can be raised while the XAML is still loading.
         if (!_databaseReady || _scanCancellation is not null)
@@ -381,29 +382,45 @@ public partial class MainWindow : Window
             UpdateFolderStatus();
             return;
         }
-        ResetSearchView("Ready to search", "Click Find or press Enter to search your selected folders.");
         UpdateFindButton();
+        await RunSearchAsync(debounce: true);
     }
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
 
-    private async Task RunSearchAsync()
+    private async Task RunSearchAsync(bool debounce = false)
     {
         var store = _metadataStore;
         var query = this.FindControl<TextBox>("SearchBox")!.Text ?? "";
-        if (!_databaseReady || store is null || _scanCancellation is not null || _folders.Count == 0)
+        if (!_databaseReady || store is null || _scanCancellation is not null || _folders.Count == 0 || !IsVisible)
             return;
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            ResetSearchView("Ready to search", "Enter words you remember; results appear when you pause typing.");
+            return;
+        }
         if (SearchQuery.BuildFtsExpression(query) is null)
         {
             ResetSearchView("Enter searchable words", "Type a word, number, or part of a sentence.");
             return;
         }
 
-        ResetSearchView("Searching...", "Searching saved filenames and file contents.");
+        ResetSearchView(debounce ? "Waiting for typing..." : "Searching...",
+            debounce ? "Results appear when you pause. Find or Enter searches immediately."
+                : "Searching saved filenames and file contents.");
         using var cancellation = new CancellationTokenSource();
         _searchCancellation = cancellation;
         try
         {
+            // The delay and database query share cancellation: typing, clearing, scanning,
+            // changing folders, or closing must also cancel a search that has not started yet.
+            if (debounce)
+                await Task.Delay(SearchDebounceMilliseconds, cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(_searchCancellation, cancellation) || !IsVisible)
+                return;
+            this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Searching...";
+            this.FindControl<TextBlock>("EmptyStateDescription")!.Text = "Searching saved filenames and file contents.";
             // Fetch one extra row so the status can distinguish an exact count from a capped result.
             var results = await store.SearchFoldersAsync(query, _folders, 101, cancellation.Token);
             if (!ReferenceEquals(_searchCancellation, cancellation) || cancellation.IsCancellationRequested || !IsVisible)
