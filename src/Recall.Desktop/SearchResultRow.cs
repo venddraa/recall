@@ -14,6 +14,9 @@ public sealed class SearchResultRow(SearchResult result)
     public string Snippet => string.IsNullOrWhiteSpace(result.Snippet)
         ? "This file matched its name.\n\n" + MissingPreviewReason
         : result.Snippet;
+    public IReadOnlyList<SearchSnippetPart> SnippetParts =>
+        !string.IsNullOrWhiteSpace(result.Snippet) && result.SnippetParts is { Count: > 0 } parts
+            ? parts : [new(Snippet, false)];
 
     private string MissingPreviewReason => result.ExtractionStatus switch
     {

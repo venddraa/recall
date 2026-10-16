@@ -469,10 +469,15 @@ public sealed class FileMetadataStore
             cancellationToken.ThrowIfCancellationRequested();
             using var connection = OpenConnection();
             using var command = connection.CreateCommand();
+            // Fresh markers keep literal document text (including HTML-like tags) distinct
+            // from the match boundaries inserted by FTS5. They are never stored in the index.
+            var marker = Guid.NewGuid().ToString("N");
+            var matchStart = $"\u001e{marker}:start\u001f";
+            var matchEnd = $"\u001e{marker}:end\u001f";
             command.CommandText = """
                 SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
                     bm25(file_search, 10.0, 1.0) AS rank,
-                    snippet(file_search, 1, '', '', ' … ', 32), t.status
+                    snippet(file_search, 1, $matchStart, $matchEnd, ' … ', 32), t.status
                 FROM file_search
                 JOIN file_metadata AS m ON m.id = file_search.rowid
                 LEFT JOIN file_text AS t ON t.file_id = m.id
@@ -494,6 +499,8 @@ public sealed class FileMetadataStore
             }
             command.Parameters.AddWithValue("$query", expression);
             command.Parameters.AddWithValue("$limit", limit);
+            command.Parameters.AddWithValue("$matchStart", matchStart);
+            command.Parameters.AddWithValue("$matchEnd", matchEnd);
             // SqliteCommand.Cancel is a no-op. Each search owns its connection, so interrupting
             // this handle only stops this query. Dispose the registration before closing it.
             var handle = connection.Handle!;
@@ -510,9 +517,11 @@ public sealed class FileMetadataStore
                     // Missing or unrecognized status must not hide an otherwise valid filename match.
                     TextExtractionStatus? extractionStatus = Enum.TryParse<TextExtractionStatus>(savedStatus, out var parsedStatus)
                         && Enum.GetName(parsedStatus) == savedStatus ? parsedStatus : null;
+                    var parts = ReadSnippetParts(reader.GetString(7), matchStart, matchEnd);
                     results.Add(new SearchResult(
                         reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6), reader.GetString(7), extractionStatus));
+                        reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6),
+                        string.Concat(parts.Select(part => part.Text)), extractionStatus, parts));
                 }
                 cancellationToken.ThrowIfCancellationRequested();
             }
@@ -524,6 +533,29 @@ public sealed class FileMetadataStore
 
             return results.AsReadOnly();
         }, cancellationToken);
+    }
+
+    private static IReadOnlyList<SearchSnippetPart> ReadSnippetParts(string snippet, string matchStart, string matchEnd)
+    {
+        var parts = new List<SearchSnippetPart>();
+        var position = 0;
+        while (position < snippet.Length)
+        {
+            var start = snippet.IndexOf(matchStart, position, StringComparison.Ordinal);
+            var end = start < 0 ? -1 : snippet.IndexOf(matchEnd, start + matchStart.Length, StringComparison.Ordinal);
+            if (start < 0 || end < 0)
+            {
+                parts.Add(new(snippet[position..], false));
+                break;
+            }
+            if (start > position)
+                parts.Add(new(snippet[position..start], false));
+            var textStart = start + matchStart.Length;
+            if (end > textStart)
+                parts.Add(new(snippet[textStart..end], true));
+            position = end + matchEnd.Length;
+        }
+        return parts.AsReadOnly();
     }
 
     public Task<StoredFile?> GetFileAsync(string fullPath, CancellationToken cancellationToken = default)

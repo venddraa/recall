@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Microsoft.Data.Sqlite;
@@ -466,13 +468,36 @@ public partial class MainWindow : Window
     private void ResultsList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         UpdateFileActionMenus();
-        var preview = this.FindControl<TextBox>("ContentPreview");
+        UpdateContentPreview((sender as ListBox)?.SelectedItem as SearchResultRow);
+    }
+
+    private void UpdateContentPreview(SearchResultRow? row)
+    {
+        var preview = this.FindControl<SelectableTextBlock>("ContentPreview");
         if (preview is null)
             return;
-        preview.Text =
-            (sender as ListBox)?.SelectedItem is SearchResultRow row
-                ? row.FullPath + "\n\n" + row.Snippet
-                : "Select a search result to see its matching text.";
+        preview.SelectionStart = preview.SelectionEnd = 0;
+        preview.Inlines!.Clear();
+        preview.Text = null;
+        this.FindControl<ScrollViewer>("ContentPreviewScroll")!.Offset = default;
+        if (row is null)
+        {
+            preview.Text = "Select a search result to see its matching text.";
+            return;
+        }
+        preview.Inlines.Add(new Run(row.FullPath + "\n\n"));
+        foreach (var part in row.SnippetParts)
+        {
+            // Add document content as text, never as XAML or HTML markup.
+            var run = new Run(part.Text);
+            if (part.IsMatch)
+            {
+                run.Background = new SolidColorBrush(Color.Parse("#FFF2A8"));
+                run.Foreground = Brushes.Black;
+                run.FontWeight = FontWeight.Bold;
+            }
+            preview.Inlines.Add(run);
+        }
     }
 
     private void CancelSearch()
@@ -487,7 +512,7 @@ public partial class MainWindow : Window
         CancelSearch();
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
         UpdateFileActionMenus();
-        this.FindControl<TextBox>("ContentPreview")!.Text = "Select a search result to see its matching text.";
+        UpdateContentPreview(null);
         this.FindControl<TextBlock>("ResultCountText")!.Text = "0 results";
         this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = true;
         this.FindControl<TextBlock>("EmptyStateTitle")!.Text = title;

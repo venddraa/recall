@@ -11,4 +11,5 @@ public sealed record SearchResult(
     DateTime ModifiedAtUtc,
     double Rank,
     string Snippet = "",
-    TextExtractionStatus? ExtractionStatus = null);
+    TextExtractionStatus? ExtractionStatus = null,
+    IReadOnlyList<SearchSnippetPart>? SnippetParts = null);

@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using Recall.Core.Extraction;
 using Recall.Core.Scanning;
+using Recall.Core.Search;
 using Recall.Core.Storage;
 
 namespace Recall.Core.Tests;
@@ -93,6 +94,63 @@ public sealed class FileSearchTests : IDisposable
         await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
 
         Assert.Single(await store.SearchAsync("CAFE DEJA", cancellationToken: Token));
+    }
+
+    [Theory]
+    [InlineData("The CLEAR-sky index transformation is used.", "clear sky index", "CLEAR|sky|index")]
+    [InlineData("Dokumen BAPP dan ABAPP selesai.", "BAP", "BAPP")]
+    [InlineData("Café déjà vu", "CAFE DEJA", "Café|déjà")]
+    [InlineData("Cafe\u0301 déjà vu", "cafe", "Cafe\u0301")]
+    [InlineData("an annual report", "an", "an")]
+    [InlineData("😀 catatan BAPP terbaru", "bap", "BAPP")]
+    [InlineData("alpha, alpha; ALPHA!", "alpha alpha", "alpha|alpha|ALPHA")]
+    [InlineData("baris pertama\nremembered\tphrase\nbaris terakhir", "remembered phrase", "remembered|phrase")]
+    public async Task SnippetHighlightsFollowFtsMatchesAndPreserveOriginalText(
+        string content, string query, string expectedMatches)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", content);
+        await store.IndexScanAsync([file], new PlainTextExtractor(4096), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+
+        var parts = Assert.IsAssignableFrom<IReadOnlyList<SearchSnippetPart>>(result.SnippetParts);
+        Assert.Equal(content, result.Snippet);
+        Assert.Equal(content, string.Concat(parts.Select(part => part.Text)));
+        Assert.Equal(expectedMatches, string.Join("|", parts.Where(part => part.IsMatch).Select(part => part.Text)));
+        Assert.DoesNotContain(parts, part => string.IsNullOrEmpty(part.Text));
+    }
+
+    [Fact]
+    public async Task SnippetPreservesLiteralMarkupAndOnlyMarksActualMatches()
+    {
+        const string content = "<b>unrelated</b> [match] & <Run Foreground='Red'>needle</Run> </match>";
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", content);
+        await store.IndexScanAsync([file], new PlainTextExtractor(4096), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync("needle", cancellationToken: Token));
+
+        var parts = Assert.IsAssignableFrom<IReadOnlyList<SearchSnippetPart>>(result.SnippetParts);
+        Assert.Equal(content, result.Snippet);
+        Assert.Equal(content, string.Concat(parts.Select(part => part.Text)));
+        Assert.Equal("needle", Assert.Single(parts, part => part.IsMatch).Text);
+    }
+
+    [Fact]
+    public async Task FilenameOnlyMatchDoesNotHighlightUnrelatedContent()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("needle.txt", "No matching content here.");
+        await store.IndexScanAsync([file], new PlainTextExtractor(4096), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync("needle", cancellationToken: Token));
+
+        Assert.Equal("No matching content here.", result.Snippet);
+        Assert.False(Assert.Single(result.SnippetParts!).IsMatch);
     }
 
     [Fact]
@@ -230,6 +288,10 @@ public sealed class FileSearchTests : IDisposable
         Assert.Contains("remembered phrase", result.Snippet);
         Assert.True(result.Snippet.Length < 500);
         Assert.Contains("…", result.Snippet);
+        var parts = Assert.IsAssignableFrom<IReadOnlyList<SearchSnippetPart>>(result.SnippetParts);
+        Assert.Equal(result.Snippet, string.Concat(parts.Select(part => part.Text)));
+        Assert.Equal("remembered|phrase",
+            string.Join("|", parts.Where(part => part.IsMatch).Select(part => part.Text)));
     }
 
     [Fact]
@@ -242,6 +304,7 @@ public sealed class FileSearchTests : IDisposable
         var result = Assert.Single(await store.SearchAsync("unique report", cancellationToken: Token));
         Assert.Equal("", result.Snippet);
         Assert.Equal(TextExtractionStatus.Unsupported, result.ExtractionStatus);
+        Assert.Empty(result.SnippetParts!);
     }
 
     [Fact]

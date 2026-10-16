@@ -127,11 +127,15 @@
                     <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Padding="8,5">
                         <TextBlock Text="Content preview" />
                     </Border>
-                    <TextBox x:Name="ContentPreview" Grid.Row="1" IsReadOnly="True" BorderThickness="0"
-                             TextWrapping="Wrap" Background="#F5F5F5"
-                             Foreground="#606060" Padding="10"
-                             Text="Select a search result to see its matching text."
-                             AutomationProperties.Name="Matching file content" />
+                    <ScrollViewer x:Name="ContentPreviewScroll" Grid.Row="1" Background="#F5F5F5"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <SelectableTextBlock x:Name="ContentPreview" TextWrapping="Wrap"
+                                             Foreground="#606060" Padding="10" Focusable="True"
+                                             SelectionBrush="#CDE8F5" SelectionForegroundBrush="Black"
+                                             Text="Select a search result to see its matching text."
+                                             AutomationProperties.Name="Matching file content" />
+                    </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>
