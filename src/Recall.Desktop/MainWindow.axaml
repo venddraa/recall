@@ -36,6 +36,8 @@
                               Click="Settings_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Help">
+                    <MenuItem Header="_Search Tips..." InputGesture="F1" Click="SearchHelp_OnClick" />
+                    <Separator />
                     <MenuItem Header="_About Recall..." Click="About_OnClick" />
                 </MenuItem>
             </Menu>

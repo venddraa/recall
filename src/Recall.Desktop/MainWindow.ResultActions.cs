@@ -9,9 +9,17 @@ public partial class MainWindow
 {
     private ContextMenu? _resultContextMenu;
 
-    private void MainWindow_OnShortcutKeyDown(object? sender, KeyEventArgs e)
+    private async void MainWindow_OnShortcutKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Handled || e.Key != Key.F || e.KeyModifiers != KeyModifiers.Control)
+        if (e.Handled)
+            return;
+        if (e.Key == Key.F1 && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            await ShowSearchHelpAsync();
+            return;
+        }
+        if (e.Key != Key.F || e.KeyModifiers != KeyModifiers.Control)
             return;
         var searchBox = this.FindControl<TextBox>("SearchBox")!;
         if (!searchBox.IsEnabled)

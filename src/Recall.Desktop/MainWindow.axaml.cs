@@ -360,6 +360,14 @@ public partial class MainWindow : Window
         await new AboutWindow().ShowDialog(this);
     }
 
+    private async void SearchHelp_OnClick(object? sender, RoutedEventArgs e) => await ShowSearchHelpAsync();
+
+    private Task ShowSearchHelpAsync()
+    {
+        CloseResultContextMenu();
+        return new SearchHelpWindow().ShowDialog(this);
+    }
+
     private async void SearchBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape && sender is TextBox searchBox)

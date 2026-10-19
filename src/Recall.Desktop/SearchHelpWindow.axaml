@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Recall.Desktop.SearchHelpWindow"
+        Title="Recall Search Tips"
+        Width="620" Height="540" MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterOwner" Background="#D4D0C8">
+    <Grid RowDefinitions="*,Auto" Margin="14">
+        <Border BorderBrush="#808080" BorderThickness="1" Background="White">
+            <ScrollViewer x:Name="HelpContentScroll" Focusable="True"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="14" Spacing="10">
+                    <TextBlock Text="Find a file by what you remember" FontWeight="Bold" />
+                    <TextBlock Text="Choose Index → Indexed Folders to add a folder, then Index → Scan Folders. Type words from a filename or its contents; results appear when you pause typing."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Search rules" FontWeight="Bold" Margin="0,6,0,0" />
+                    <TextBlock Text="Every word must match the filename or indexed content, in any order. For example, clear sky index can match clear-sky index. Quotes do not request an exact phrase."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Words with 3 or more characters also match word beginnings: BAP finds BAPP. Words with 1 or 2 characters match whole words. Search ignores letter case; café also matches cafe."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Up to 100 results are shown. Add more words to narrow the search. Select a result to see its matching text, or double-click it to open the file."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="If a file is missing" FontWeight="Bold" Margin="0,6,0,0" />
+                    <TextBlock Text="Check that its folder is selected, then use Scan Folders. Changes made while Recall was closed need a scan; Tools → Settings can enable scanning on startup."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Content search supports plain-text files up to 5 MiB, and text-layer PDFs, DOCX documents and IPYNB notebooks up to 20 MiB. Scanned images are not read as text. Files whose contents cannot be indexed can still match their names."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="If only the filename matches, the preview explains why content is unavailable. To reread file contents, choose Index → Indexed Folders, select the folder, then Reindex Folder."
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Keyboard shortcuts" FontWeight="Bold" Margin="0,6,0,0" />
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
+                        <TextBlock Text="Ctrl+F" />
+                        <TextBlock Grid.Column="1" Text="Focus and select the search text" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Text="Enter" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="In search: find immediately. In results: open file." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Text="Down" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="From search: focus the results" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Text="Ctrl+Enter" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="In results: open the containing folder" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="4" Text="Ctrl+Shift+C" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="In results: copy the file path" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="5" Text="Ctrl+C" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" Text="In preview: copy selected text" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="6" Text="Escape" />
+                        <TextBlock Grid.Row="6" Grid.Column="1" Text="In search: clear the query. In this dialog: close." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="7" Text="F1" />
+                        <TextBlock Grid.Row="7" Grid.Column="1" Text="Open Search Tips from the main window" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        <Button Grid.Row="1" Content="Close" MinWidth="76" Margin="0,12,0,0"
+                HorizontalAlignment="Right" IsDefault="True" IsCancel="True"
+                Click="Close_OnClick" />
+    </Grid>
+</Window>
