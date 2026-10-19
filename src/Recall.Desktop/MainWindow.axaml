@@ -144,11 +144,17 @@
 
         <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
                 Padding="10,6">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                <TextBlock x:Name="ResultCountText" Text="0 results" />
-                <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0" />
-                <TextBlock x:Name="StoredFileCountText" Grid.Column="2" Text="Stored files: 0" Margin="16,0" />
-                <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings" />
+            <Grid ColumnDefinitions="2*,Auto,Auto,3*">
+                <TextBlock x:Name="ResultCountText" Text="0 results"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding #ResultCountText.Text}" />
+                <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0"
+                           ToolTip.Tip="{Binding #FolderCountText.Text}" />
+                <TextBlock x:Name="StoredFileCountText" Grid.Column="2" Text="Stored files: 0" Margin="16,0"
+                           ToolTip.Tip="{Binding #StoredFileCountText.Text}" />
+                <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding #IndexStatusText.Text}" />
             </Grid>
         </Border>
     </Grid>
