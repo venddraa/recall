@@ -188,7 +188,7 @@ public partial class MainWindow : Window
                 ? "Enter words you remember; results appear when you pause typing.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
                 : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
             : "Choose Index → Indexed Folders to add a folder.");
-        UpdateFindButton();
+        UpdateSearchButtons();
     }
 
     private async void ScanFolders_OnClick(object? sender, RoutedEventArgs e) => await ScanFoldersAsync(_folders);
@@ -348,7 +348,7 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
         this.FindControl<TextBox>("SearchBox")!.IsEnabled = !scanning;
-        UpdateFindButton();
+        UpdateSearchButtons();
     }
 
     private void Exit_OnClick(object? sender, RoutedEventArgs e)
@@ -371,9 +371,9 @@ public partial class MainWindow : Window
 
     private async void SearchBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && sender is TextBox searchBox)
+        if (e.Key == Key.Escape)
         {
-            searchBox.Clear();
+            ClearSearch();
             e.Handled = true;
         }
         else if (e.Key == Key.Enter)
@@ -389,6 +389,7 @@ public partial class MainWindow : Window
 
     private async void SearchBox_OnTextChanged(object? sender, TextChangedEventArgs e)
     {
+        UpdateSearchButtons();
         // TextChanged can be raised while the XAML is still loading.
         if (!_databaseReady || _scanCancellation is not null)
             return;
@@ -397,11 +398,23 @@ public partial class MainWindow : Window
             UpdateFolderStatus();
             return;
         }
-        UpdateFindButton();
         await RunSearchAsync(debounce: true);
     }
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
+
+    private void ClearSearch_OnClick(object? sender, RoutedEventArgs e) => ClearSearch();
+
+    private void ClearSearch()
+    {
+        if (_scanCancellation is not null)
+            return;
+        // Cancel immediately, including a pending debounce, before TextChanged is delivered.
+        CancelSearch();
+        var searchBox = this.FindControl<TextBox>("SearchBox")!;
+        searchBox.Clear();
+        searchBox.Focus();
+    }
 
     private async Task RunSearchAsync(bool debounce = false, bool refresh = false)
     {
@@ -565,10 +578,15 @@ public partial class MainWindow : Window
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text = description;
     }
 
-    private void UpdateFindButton()
+    private void UpdateSearchButtons()
     {
-        this.FindControl<Button>("FindButton")!.IsEnabled = _databaseReady && _scanCancellation is null
-            && _folders.Count > 0 && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text);
+        // Controls can still be missing when TextChanged fires during XAML loading.
+        var query = this.FindControl<TextBox>("SearchBox")?.Text;
+        if (this.FindControl<Button>("FindButton") is { } find)
+            find.IsEnabled = _databaseReady && _scanCancellation is null
+                && _folders.Count > 0 && !string.IsNullOrWhiteSpace(query);
+        if (this.FindControl<Button>("ClearSearchButton") is { } clear)
+            clear.IsEnabled = _scanCancellation is null && !string.IsNullOrEmpty(query);
     }
 
     private void UpdateFileActionMenus()

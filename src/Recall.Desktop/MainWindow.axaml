@@ -43,7 +43,7 @@
             </Menu>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="10,12">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="10,12">
             <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,8,0" />
             <TextBox x:Name="SearchBox"
                      Grid.Column="1"
@@ -54,6 +54,10 @@
                      KeyDown="SearchBox_OnKeyDown" />
             <Button x:Name="FindButton" Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
                     IsEnabled="False" Click="Find_OnClick" />
+            <Button x:Name="ClearSearchButton" Grid.Column="3" Content="Clear" MinWidth="76" Margin="8,0,0,0"
+                    IsEnabled="False" Click="ClearSearch_OnClick"
+                    ToolTip.Tip="Clear the search and its results (Escape in the search box)"
+                    AutomationProperties.Name="Clear search" />
         </Grid>
 
         <Grid Grid.Row="2" Margin="10,0,10,10">
