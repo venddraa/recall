@@ -67,7 +67,7 @@ public partial class MainWindow
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = "Some updates skipped. Use Scan Folders to retry.";
             if (!string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
                 // A watcher refresh must not bypass the delay while the user is typing.
-                await RunSearchAsync(debounce: true);
+                await RunSearchAsync(debounce: true, refresh: true);
             else
                 ResetSearchView("Index updated", "Automatic updates are active while Recall is open.");
         });

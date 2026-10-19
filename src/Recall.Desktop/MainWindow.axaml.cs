@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private long _storedFileCount;
     private long _textFileCount;
     private CancellationTokenSource? _searchCancellation;
+    private string? _displayedQuery;
     private bool _copyingPath;
     private bool _openingFile;
     private bool _openingFolder;
@@ -402,7 +403,7 @@ public partial class MainWindow : Window
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
 
-    private async Task RunSearchAsync(bool debounce = false)
+    private async Task RunSearchAsync(bool debounce = false, bool refresh = false)
     {
         var store = _metadataStore;
         var query = this.FindControl<TextBox>("SearchBox")!.Text ?? "";
@@ -419,9 +420,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        ResetSearchView(debounce ? "Waiting for typing..." : "Searching...",
-            debounce ? "Results appear when you pause. Find or Enter searches immediately."
-                : "Searching saved filenames and file contents.");
+        var keepResults = refresh && string.Equals(query, _displayedQuery, StringComparison.Ordinal);
+        if (keepResults)
+        {
+            CloseResultContextMenu();
+            CancelSearch();
+        }
+        else
+        {
+            ResetSearchView(debounce ? "Waiting for typing..." : "Searching...",
+                debounce ? "Results appear when you pause. Find or Enter searches immediately."
+                    : "Searching saved filenames and file contents.");
+        }
         using var cancellation = new CancellationTokenSource();
         _searchCancellation = cancellation;
         try
@@ -440,7 +450,13 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(_searchCancellation, cancellation) || cancellation.IsCancellationRequested || !IsVisible)
                 return;
             var rows = results.Take(100).Select(result => new SearchResultRow(result)).ToArray();
-            this.FindControl<ListBox>("ResultsList")!.ItemsSource = rows;
+            var list = this.FindControl<ListBox>("ResultsList")!;
+            // Read the current selection after the query: the user may have navigated
+            // to a different file while this background refresh was running.
+            var selectedPath = keepResults ? (list.SelectedItem as SearchResultRow)?.FullPath : null;
+            var restoreFocus = keepResults && IsActive && list.IsKeyboardFocusWithin;
+            list.ItemsSource = rows;
+            _displayedQuery = query;
             this.FindControl<TextBlock>("ResultCountText")!.Text = results.Count > 100
                 ? "100 results shown (more available)"
                 : $"{rows.Length:N0} results";
@@ -451,10 +467,24 @@ public partial class MainWindow : Window
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     "Try different words, or choose Index → Scan Folders if your files have changed.";
             }
-            else
+            if (keepResults)
             {
-                this.FindControl<ListBox>("ResultsList")!.SelectedIndex = 0;
+                // Do not silently select another file if the chosen file disappeared
+                // or no longer appears among the matching results.
+                list.SelectedIndex = Array.FindIndex(rows,
+                    row => string.Equals(row.FullPath, selectedPath, StringComparison.Ordinal));
+                if (list.SelectedIndex >= 0)
+                    list.ScrollIntoView(list.SelectedIndex);
+                if (restoreFocus)
+                {
+                    if (list.SelectedIndex >= 0)
+                        FocusSearchResults();
+                    else
+                        list.Focus();
+                }
             }
+            else if (rows.Length > 0)
+                list.SelectedIndex = 0;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -465,9 +495,12 @@ public partial class MainWindow : Window
             Trace.TraceError("File search failed: {0}", exception);
             if (ReferenceEquals(_searchCancellation, cancellation) && IsVisible)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Could not search the index";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = keepResults
+                    ? "Could not refresh search results" : "Could not search the index";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
                     "Try again. If the problem persists, restart Recall and check the local database.";
+                if (keepResults)
+                    this.FindControl<TextBlock>("IndexStatusText")!.Text = "Results could not be refreshed. Press Find to retry.";
             }
         }
         finally
@@ -522,6 +555,7 @@ public partial class MainWindow : Window
     {
         CloseResultContextMenu();
         CancelSearch();
+        _displayedQuery = null;
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
         UpdateFileActionMenus();
         UpdateContentPreview(null);
