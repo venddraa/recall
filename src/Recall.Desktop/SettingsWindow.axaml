@@ -14,7 +14,14 @@
             </CheckBox>
             <TextBlock Text="Changes are watched only in your selected folders.&#10;When disabled, use Index → Scan Folders to update the index."
                        TextWrapping="Wrap" Foreground="#606060" />
-            <TextBlock Text="After enabling updates again or reopening Recall, use Scan Folders to catch changes made while updates were off."
+            <TextBlock Text="Use Scan Folders, or enable startup scanning below, to catch changes made while Recall was closed or automatic updates were off."
+                       TextWrapping="Wrap" Foreground="#606060" />
+            <CheckBox x:Name="ScanOnStartupCheckBox"
+                      IsChecked="False" IsThreeState="False"
+                      AutomationProperties.Name="Scan selected folders when Recall opens">
+                <TextBlock Text="Scan selected folders when Recall opens" TextWrapping="Wrap" />
+            </CheckBox>
+            <TextBlock Text="Starts on the next launch, even if automatic updates are off. Large folders may take time. Use Index → Cancel Scan to stop."
                        TextWrapping="Wrap" Foreground="#606060" />
         </StackPanel>
         <TextBlock x:Name="MessageText" Grid.Row="2" IsVisible="False"

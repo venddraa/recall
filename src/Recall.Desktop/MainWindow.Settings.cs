@@ -57,9 +57,12 @@ public partial class MainWindow
             this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
             UpdateMonitoringStatus();
             if (string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
-                ResetSearchView("Settings saved", saved.AutomaticUpdates
+                ResetSearchView("Settings saved", (saved.AutomaticUpdates
                     ? "Automatic updates are enabled. Use Index → Scan Folders to catch changes made while updates were off."
-                    : "Automatic updates are disabled. Use Index → Scan Folders when you want to update the index.");
+                    : "Automatic updates are disabled. Use Index → Scan Folders when you want to update the index.")
+                    + (saved.ScanOnStartup
+                        ? "\nStartup scanning is enabled. Selected folders will be scanned the next time Recall opens."
+                        : "\nStartup scanning is disabled."));
         }
         finally
         {

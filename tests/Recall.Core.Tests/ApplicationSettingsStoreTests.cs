@@ -11,21 +11,42 @@ public sealed class ApplicationSettingsStoreTests : IDisposable
     [Fact]
     public async Task FirstLaunchKeepsAutomaticUpdatesEnabledWithoutCreatingConfiguration()
     {
-        Assert.True((await CreateStore().LoadAsync(TestContext.Current.CancellationToken)).AutomaticUpdates);
+        var settings = await CreateStore().LoadAsync(TestContext.Current.CancellationToken);
+        Assert.True(settings.AutomaticUpdates);
+        Assert.False(settings.ScanOnStartup);
         Assert.False(Directory.Exists(_directory));
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task SavedChoicesSurviveRestartAndReplacement(bool automaticUpdates, bool scanOnStartup)
+    {
+        var store = CreateStore();
+        await store.SaveAsync(new(!automaticUpdates, !scanOnStartup), TestContext.Current.CancellationToken);
+        var expected = new ApplicationSettings(automaticUpdates, scanOnStartup);
+        await store.SaveAsync(expected, TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, await CreateStore().LoadAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task SavedChoiceSurvivesRestartAndReplacement(bool enabled)
+    public async Task OlderSettingsKeepStartupScanningOffWithoutRewritingTheFile(bool automaticUpdates)
     {
         var store = CreateStore();
-        await store.SaveAsync(new(!enabled), TestContext.Current.CancellationToken);
-        await store.SaveAsync(new(enabled), TestContext.Current.CancellationToken);
+        Directory.CreateDirectory(Path.GetDirectoryName(store.FilePath)!);
+        var original = "{\"version\":1,\"automaticUpdates\":" + (automaticUpdates ? "true" : "false") + "}";
+        await File.WriteAllTextAsync(store.FilePath, original, TestContext.Current.CancellationToken);
 
-        Assert.Equal(enabled, (await CreateStore().LoadAsync(TestContext.Current.CancellationToken)).AutomaticUpdates);
-        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
+        var settings = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new ApplicationSettings(automaticUpdates, ScanOnStartup: false), settings);
+        Assert.Equal(original, await File.ReadAllTextAsync(store.FilePath, TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -36,6 +57,9 @@ public sealed class ApplicationSettingsStoreTests : IDisposable
     [InlineData("{\"version\":1}")]
     [InlineData("{\"version\":1,\"automaticUpdates\":null}")]
     [InlineData("{\"version\":1,\"automaticUpdates\":\"false\"}")]
+    [InlineData("{\"version\":1,\"automaticUpdates\":true,\"scanOnStartup\":null}")]
+    [InlineData("{\"version\":1,\"automaticUpdates\":true,\"scanOnStartup\":\"true\"}")]
+    [InlineData("{\"version\":1,\"automaticUpdates\":true,\"scanOnStartup\":1}")]
     public async Task UnreadableSettingsAreReportedWithoutOverwritingTheSavedChoice(string original)
     {
         var store = CreateStore();
@@ -50,12 +74,14 @@ public sealed class ApplicationSettingsStoreTests : IDisposable
     public async Task CancelledSavePreservesThePreviousChoice()
     {
         var store = CreateStore();
-        await store.SaveAsync(new(false), TestContext.Current.CancellationToken);
+        var previous = new ApplicationSettings(AutomaticUpdates: false, ScanOnStartup: true);
+        await store.SaveAsync(previous, TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.SaveAsync(new(true), cancellation.Token));
-        Assert.False((await store.LoadAsync(TestContext.Current.CancellationToken)).AutomaticUpdates);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.SaveAsync(
+            new(AutomaticUpdates: true, ScanOnStartup: false), cancellation.Token));
+        Assert.Equal(previous, await store.LoadAsync(TestContext.Current.CancellationToken));
         Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
     }
 

@@ -118,6 +118,10 @@ public partial class MainWindow : Window
                 this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = _settingsStore is not null;
             }
         }
+        // Reuse manual scanning, including cancellation, incremental text extraction,
+        // watcher coordination, and rollback. Existing settings keep this off by default.
+        if (IsVisible && _databaseReady && _settings.ScanOnStartup && _folders.Count > 0)
+            await ScanFoldersAsync(_folders);
     }
 
     private async void IndexedFolders_OnClick(object? sender, RoutedEventArgs e)

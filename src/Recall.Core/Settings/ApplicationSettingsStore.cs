@@ -28,7 +28,8 @@ public sealed class ApplicationSettingsStore
             var settings = await JsonSerializer.DeserializeAsync<SavedSettings>(stream, JsonOptions, cancellationToken);
             if (settings is null || settings.Version != 1 || settings.AutomaticUpdates is null)
                 throw new InvalidDataException("The application settings have an invalid format or version.");
-            return new(settings.AutomaticUpdates.Value);
+            // Older settings have no startup choice. Keep startup scanning opt-in.
+            return new(settings.AutomaticUpdates.Value, settings.ScanOnStartup);
         }
         catch (FileNotFoundException) { return new(); }
         catch (DirectoryNotFoundException) { return new(); }
@@ -64,7 +65,7 @@ public sealed class ApplicationSettingsStore
             await using (var stream = new FileStream(temporaryPath, options))
             {
                 await JsonSerializer.SerializeAsync(stream,
-                    new SavedSettings(1, settings.AutomaticUpdates), JsonOptions, cancellationToken);
+                    new SavedSettings(1, settings.AutomaticUpdates, settings.ScanOnStartup), JsonOptions, cancellationToken);
                 await stream.FlushAsync(cancellationToken);
             }
             cancellationToken.ThrowIfCancellationRequested();
@@ -80,5 +81,5 @@ public sealed class ApplicationSettingsStore
         }
     }
 
-    private sealed record SavedSettings(int Version, bool? AutomaticUpdates);
+    private sealed record SavedSettings(int Version, bool? AutomaticUpdates, bool ScanOnStartup = false);
 }

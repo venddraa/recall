@@ -23,8 +23,9 @@ public partial class SettingsWindow : Window
     {
         _store = store;
         this.FindControl<CheckBox>("AutomaticUpdatesCheckBox")!.IsChecked = settings.AutomaticUpdates;
+        this.FindControl<CheckBox>("ScanOnStartupCheckBox")!.IsChecked = settings.ScanOnStartup;
         if (problem is not null)
-            ShowError("Could not read saved settings. Automatic updates are off. Saving here replaces the unreadable settings.");
+            ShowError("Could not read saved settings. Automatic updates and startup scanning are off. Saving here replaces the unreadable settings.");
         SetBusy(false);
     }
 
@@ -32,7 +33,9 @@ public partial class SettingsWindow : Window
     {
         if (_busy || _store is not { } store)
             return;
-        var settings = new ApplicationSettings(this.FindControl<CheckBox>("AutomaticUpdatesCheckBox")!.IsChecked == true);
+        var settings = new ApplicationSettings(
+            AutomaticUpdates: this.FindControl<CheckBox>("AutomaticUpdatesCheckBox")!.IsChecked == true,
+            ScanOnStartup: this.FindControl<CheckBox>("ScanOnStartupCheckBox")!.IsChecked == true);
         SetBusy(true);
         try
         {
@@ -57,6 +60,7 @@ public partial class SettingsWindow : Window
     {
         _busy = busy;
         this.FindControl<CheckBox>("AutomaticUpdatesCheckBox")!.IsEnabled = !busy;
+        this.FindControl<CheckBox>("ScanOnStartupCheckBox")!.IsEnabled = !busy;
         this.FindControl<Button>("SaveButton")!.IsEnabled = !busy && _store is not null;
         this.FindControl<Button>("CancelButton")!.IsEnabled = !busy;
     }
