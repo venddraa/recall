@@ -180,6 +180,89 @@ public sealed class FileSearchTests : IDisposable
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => store.SearchAsync("shared", 501, Token));
     }
 
+    [Theory]
+    [InlineData(100)]
+    [InlineData(200)]
+    [InlineData(205)]
+    public async Task PagesPreserveRankingWithoutDuplicatesAndHaveAccurateLookahead(int fileCount)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var files = new List<ScannedFile>();
+        for (var index = 0; index < fileCount; index++)
+            files.Add(await WriteFile($"set-{index:D3}/report.txt",
+                string.Join(" ", Enumerable.Repeat("shared", 1 + index % 4)) + " other text"));
+        await store.IndexScanAsync(files, new PlainTextExtractor(1024), cancellationToken: Token);
+        var expected = await store.SearchAsync("shared", 500, Token);
+        var actualPaths = new List<string>();
+
+        for (var offset = 0; offset < fileCount; offset += 100)
+        {
+            var page = await store.SearchAsync("shared", 101, Token, offset: offset);
+            Assert.Equal(Math.Min(101, fileCount - offset), page.Count);
+            actualPaths.AddRange(page.Take(100).Select(result => result.FullPath));
+        }
+
+        Assert.Equal(expected.Select(result => result.FullPath), actualPaths);
+        Assert.Equal(fileCount, actualPaths.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public async Task PageOffsetIsAppliedAfterFilteringSelectedFolders()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var a = await WriteFile("Selected/a.txt", "shared content");
+        var b = await WriteFile("Selected/nested/b.txt", "shared content");
+        var c = await WriteFile("Selected/c.txt", "shared content");
+        var sibling = await WriteFile("SelectedOther/first.txt", "shared shared shared content");
+        await store.IndexScanAsync([a, b, c, sibling], new PlainTextExtractor(1024), cancellationToken: Token);
+        string[] roots = [Path.GetDirectoryName(a.FullPath)!];
+        var expected = await store.SearchFoldersAsync("shared", roots, cancellationToken: Token);
+
+        var page = await store.SearchFoldersAsync("shared", roots, 1, Token, offset: 1);
+
+        Assert.Equal(expected[1].FullPath, Assert.Single(page).FullPath);
+        Assert.DoesNotContain(page, result => result.FullPath == sibling.FullPath);
+    }
+
+    [Fact]
+    public async Task PagePastTheLastResultReturnsAnEmptyList()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", "shared content");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        Assert.Empty(await store.SearchAsync("shared", cancellationToken: Token, offset: 1));
+        Assert.Empty(await store.SearchFoldersAsync("shared", [Path.GetDirectoryName(file.FullPath)!],
+            cancellationToken: Token, offset: int.MaxValue));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-100)]
+    [InlineData(int.MinValue)]
+    public async Task NegativePageOffsetsAreRejectedEvenForEmptyQueriesAndFolders(int offset)
+    {
+        var store = CreateStore();
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            store.SearchAsync("shared", cancellationToken: Token, offset: offset));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            store.SearchAsync("", cancellationToken: Token, offset: offset));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            store.SearchFoldersAsync("shared", [], cancellationToken: Token, offset: offset));
+    }
+
+    [Fact]
+    public async Task PageRequestsHonorCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            CreateStore().SearchAsync("shared", cancellationToken: cancellation.Token, offset: 100));
+    }
+
     [Fact]
     public async Task ChangedAndInvalidContentIsRemovedFromSearchIndex()
     {

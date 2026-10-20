@@ -438,25 +438,26 @@ public sealed class FileMetadataStore
     }
 
     public Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int limit = 100,
-        CancellationToken cancellationToken = default)
-        => SearchIndexAsync(query, null, limit, cancellationToken);
+        CancellationToken cancellationToken = default, int offset = 0)
+        => SearchIndexAsync(query, null, limit, offset, cancellationToken);
 
     public Task<IReadOnlyList<SearchResult>> SearchFoldersAsync(string query, IEnumerable<string> folders,
-        int limit = 100, CancellationToken cancellationToken = default)
+        int limit = 100, CancellationToken cancellationToken = default, int offset = 0)
     {
         ArgumentNullException.ThrowIfNull(folders);
         var prefixes = folders.Select(FolderPath.Normalize).Distinct(StringComparer.Ordinal)
             .Select(path => Path.EndsInDirectorySeparator(path) ? path : path + Path.DirectorySeparatorChar)
             .ToArray();
-        return SearchIndexAsync(query, prefixes, limit, cancellationToken);
+        return SearchIndexAsync(query, prefixes, limit, offset, cancellationToken);
     }
 
     private Task<IReadOnlyList<SearchResult>> SearchIndexAsync(string query, string[]? folderPrefixes,
-        int limit, CancellationToken cancellationToken)
+        int limit, int offset, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 500);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         cancellationToken.ThrowIfCancellationRequested();
         var expression = SearchQuery.BuildFtsExpression(query);
         if (expression is null || folderPrefixes is { Length: 0 })
@@ -483,7 +484,7 @@ public sealed class FileMetadataStore
                 LEFT JOIN file_text AS t ON t.file_id = m.id
                 WHERE file_search MATCH $query
                 ORDER BY rank, m.filename COLLATE NOCASE, m.full_path
-                LIMIT $limit;
+                LIMIT $limit OFFSET $offset;
                 """;
             if (folderPrefixes is not null)
             {
@@ -499,6 +500,7 @@ public sealed class FileMetadataStore
             }
             command.Parameters.AddWithValue("$query", expression);
             command.Parameters.AddWithValue("$limit", limit);
+            command.Parameters.AddWithValue("$offset", offset);
             command.Parameters.AddWithValue("$matchStart", matchStart);
             command.Parameters.AddWithValue("$matchEnd", matchEnd);
             // SqliteCommand.Cancel is a no-op. Each search owns its connection, so interrupting

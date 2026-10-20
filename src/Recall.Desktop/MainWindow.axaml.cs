@@ -20,6 +20,7 @@ namespace Recall.Desktop;
 public partial class MainWindow : Window
 {
     private const int SearchDebounceMilliseconds = 300;
+    private const int SearchPageSize = 100;
     private const int MaximumTextFileBytes = 5 * 1024 * 1024;
     private const int MaximumDocumentFileBytes = 20 * 1024 * 1024;
     private const int MaximumDocumentTextCharacters = 5 * 1024 * 1024;
@@ -32,6 +33,8 @@ public partial class MainWindow : Window
     private long _textFileCount;
     private CancellationTokenSource? _searchCancellation;
     private string? _displayedQuery;
+    private int _searchPage;
+    private bool _hasNextSearchPage;
     private bool _copyingPath;
     private bool _openingFile;
     private bool _openingFolder;
@@ -403,6 +406,18 @@ public partial class MainWindow : Window
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
 
+    private async void PreviousPage_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_searchPage > 0 && _searchCancellation is null && _scanCancellation is null)
+            await RunSearchAsync(page: _searchPage - 1);
+    }
+
+    private async void NextPage_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_hasNextSearchPage && _searchCancellation is null && _scanCancellation is null)
+            await RunSearchAsync(page: _searchPage + 1);
+    }
+
     private void ClearSearch_OnClick(object? sender, RoutedEventArgs e) => ClearSearch();
 
     private void ClearSearch()
@@ -416,7 +431,7 @@ public partial class MainWindow : Window
         searchBox.Focus();
     }
 
-    private async Task RunSearchAsync(bool debounce = false, bool refresh = false)
+    private async Task RunSearchAsync(bool debounce = false, bool refresh = false, int page = 0)
     {
         var store = _metadataStore;
         var query = this.FindControl<TextBox>("SearchBox")!.Text ?? "";
@@ -433,6 +448,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A watcher may interrupt a page request; retry that page rather than jumping to page 1.
+        var requestedPage = refresh ? _searchPage : page;
         var keepResults = refresh && string.Equals(query, _displayedQuery, StringComparison.Ordinal);
         if (keepResults)
         {
@@ -446,7 +463,9 @@ public partial class MainWindow : Window
                     : "Searching saved filenames and file contents.");
         }
         using var cancellation = new CancellationTokenSource();
+        _searchPage = requestedPage;
         _searchCancellation = cancellation;
+        UpdateSearchPagination();
         try
         {
             // The delay and database query share cancellation: typing, clearing, scanning,
@@ -458,11 +477,13 @@ public partial class MainWindow : Window
                 return;
             this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Searching...";
             this.FindControl<TextBlock>("EmptyStateDescription")!.Text = "Searching saved filenames and file contents.";
-            // Fetch one extra row so the status can distinguish an exact count from a capped result.
-            var results = await store.SearchFoldersAsync(query, _folders, 101, cancellation.Token);
+            // Fetch one extra row to detect a next page without counting all matching documents.
+            var offset = checked(requestedPage * SearchPageSize);
+            var results = await store.SearchFoldersAsync(query, _folders, SearchPageSize + 1,
+                cancellation.Token, offset: offset);
             if (!ReferenceEquals(_searchCancellation, cancellation) || cancellation.IsCancellationRequested || !IsVisible)
                 return;
-            var rows = results.Take(100).Select(result => new SearchResultRow(result)).ToArray();
+            var rows = results.Take(SearchPageSize).Select(result => new SearchResultRow(result)).ToArray();
             var list = this.FindControl<ListBox>("ResultsList")!;
             // Read the current selection after the query: the user may have navigated
             // to a different file while this background refresh was running.
@@ -470,15 +491,19 @@ public partial class MainWindow : Window
             var restoreFocus = keepResults && IsActive && list.IsKeyboardFocusWithin;
             list.ItemsSource = rows;
             _displayedQuery = query;
-            this.FindControl<TextBlock>("ResultCountText")!.Text = results.Count > 100
-                ? "100 results shown (more available)"
-                : $"{rows.Length:N0} results";
+            _hasNextSearchPage = results.Count > SearchPageSize;
+            this.FindControl<TextBlock>("ResultCountText")!.Text = rows.Length == 0
+                ? "0 results on this page"
+                : $"{offset + 1:N0}–{(long)offset + rows.Length:N0} shown"
+                    + (_hasNextSearchPage ? " (more available)" : "");
             this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = rows.Length == 0;
             if (rows.Length == 0)
             {
-                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "No matching files";
-                this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    "Try different words, or choose Index → Scan Folders if your files have changed.";
+                this.FindControl<TextBlock>("EmptyStateTitle")!.Text = requestedPage > 0
+                    ? "No results on this page" : "No matching files";
+                this.FindControl<TextBlock>("EmptyStateDescription")!.Text = requestedPage > 0
+                    ? "The index may have changed. Use Previous, or Find to return to page 1."
+                    : "Try different words, or choose Index → Scan Folders if your files have changed.";
             }
             if (keepResults)
             {
@@ -519,7 +544,10 @@ public partial class MainWindow : Window
         finally
         {
             if (ReferenceEquals(_searchCancellation, cancellation))
+            {
                 _searchCancellation = null;
+                UpdateSearchPagination();
+            }
         }
     }
 
@@ -569,6 +597,9 @@ public partial class MainWindow : Window
         CloseResultContextMenu();
         CancelSearch();
         _displayedQuery = null;
+        _searchPage = 0;
+        _hasNextSearchPage = false;
+        UpdateSearchPagination();
         this.FindControl<ListBox>("ResultsList")!.ItemsSource = Array.Empty<SearchResultRow>();
         UpdateFileActionMenus();
         UpdateContentPreview(null);
@@ -576,6 +607,15 @@ public partial class MainWindow : Window
         this.FindControl<StackPanel>("EmptyStatePanel")!.IsVisible = true;
         this.FindControl<TextBlock>("EmptyStateTitle")!.Text = title;
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text = description;
+    }
+
+    private void UpdateSearchPagination()
+    {
+        var ready = _databaseReady && _scanCancellation is null && _searchCancellation is null
+            && _folders.Count > 0 && IsVisible;
+        this.FindControl<Button>("PreviousPageButton")!.IsEnabled = ready && _searchPage > 0;
+        this.FindControl<Button>("NextPageButton")!.IsEnabled = ready && _hasNextSearchPage;
+        this.FindControl<TextBlock>("SearchPageText")!.Text = $"Page {_searchPage + 1:N0}";
     }
 
     private void UpdateSearchButtons()

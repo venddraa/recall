@@ -68,7 +68,7 @@
             </Grid.RowDefinitions>
 
             <Border BorderBrush="#808080" BorderThickness="1" Background="White">
-                <Grid RowDefinitions="Auto,*">
+                <Grid RowDefinitions="Auto,*,Auto">
                     <Border Background="#D4D0C8" BorderBrush="#808080"
                             BorderThickness="0,0,0,1" Padding="8,6">
                         <Grid ColumnDefinitions="2*,3*,60,136,84">
@@ -119,6 +119,18 @@
                                    Foreground="#606060" TextWrapping="Wrap"
                                    TextAlignment="Center" />
                     </StackPanel>
+                    <Border Grid.Row="2" BorderBrush="#808080" BorderThickness="0,1,0,0"
+                            Background="#D4D0C8" Padding="6">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock x:Name="SearchPageText" Text="Page 1" VerticalAlignment="Center" />
+                            <Button x:Name="PreviousPageButton" Grid.Column="1" Content="Previous" MinWidth="86"
+                                    IsEnabled="False" Click="PreviousPage_OnClick" Margin="8,0,0,0"
+                                    AutomationProperties.Name="Previous search results page" />
+                            <Button x:Name="NextPageButton" Grid.Column="2" Content="Next" MinWidth="76"
+                                    IsEnabled="False" Click="NextPage_OnClick" Margin="8,0,0,0"
+                                    AutomationProperties.Name="Next search results page" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
 

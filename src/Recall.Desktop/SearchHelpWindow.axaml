@@ -18,7 +18,7 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="Words with 3 or more characters also match word beginnings: BAP finds BAPP. Words with 1 or 2 characters match whole words. Search ignores letter case; café also matches cafe."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Up to 100 results are shown. Add more words to narrow the search. Select a result to see its matching text, or double-click it to open the file."
+                    <TextBlock Text="Results are shown in pages of 100 files. Use Previous and Next below the list to see other pages, or add more words to narrow the search. A new query starts on page 1. Select a result to see its matching text, or double-click it to open the file."
                                TextWrapping="Wrap" />
                     <TextBlock Text="If a file is missing" FontWeight="Bold" Margin="0,6,0,0" />
                     <TextBlock Text="Check that its folder is selected, then use Scan Folders. Changes made while Recall was closed need a scan; Tools → Settings can enable scanning on startup."
