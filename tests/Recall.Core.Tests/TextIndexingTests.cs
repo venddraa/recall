@@ -87,6 +87,73 @@ public sealed class TextIndexingTests : IDisposable
     }
 
     [Fact]
+    public async Task SkippedFileDetailsKeepPathsAndReasonsWhileUnsupportedFilesAreSummarized()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var unsupported = await WriteFile("archive.zip", Encoding.UTF8.GetBytes("not extracted"));
+        var large = await WriteFile("large.txt", new byte[1025]);
+        var binary = await WriteFile("binary.txt", [0]);
+        var invalid = await WriteFile("invalid.txt", [0xc3, 0x28]);
+        var good = await WriteFile("good.txt", Encoding.UTF8.GetBytes("searchable content"));
+
+        var result = await store.IndexScanAsync([unsupported, large, binary, invalid, good],
+            new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var details = Assert.IsAssignableFrom<IReadOnlyList<SkippedFileDetail>>(result.SkippedFileDetails);
+        Assert.Equal(new[]
+        {
+            new SkippedFileDetail(large.FullPath, TextExtractionStatus.TooLarge),
+            new SkippedFileDetail(binary.FullPath, TextExtractionStatus.Binary),
+            new SkippedFileDetail(invalid.FullPath, TextExtractionStatus.InvalidEncoding)
+        }, details);
+        Assert.Equal(1, result.SkippedFiles[TextExtractionStatus.Unsupported]);
+        Assert.Equal(5, result.StoredFiles);
+        Assert.Equal(1, result.StoredTextFiles);
+        Assert.Equal(unsupported.FullPath, Assert.Single(await store.SearchAsync("archive", cancellationToken: Token)).FullPath);
+        Assert.Single(await store.SearchAsync("searchable content", cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task DiagnosticSamplesAreBoundedWithoutDroppingCountsOrFilenameIndexEntries()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var files = new List<ScannedFile>();
+        for (var index = 0; index < TextIndexResult.MaximumSkippedFileDetails + 5; index++)
+            files.Add(await WriteFile($"large-{index:000}.txt", Encoding.UTF8.GetBytes("oversized")));
+
+        var result = await store.IndexScanAsync(files, new PlainTextExtractor(1), cancellationToken: Token);
+
+        var details = Assert.IsAssignableFrom<IReadOnlyList<SkippedFileDetail>>(result.SkippedFileDetails);
+        Assert.Equal(TextIndexResult.MaximumSkippedFileDetails, details.Count);
+        Assert.Equal(files.Take(TextIndexResult.MaximumSkippedFileDetails).Select(file => file.FullPath),
+            details.Select(detail => detail.FullPath));
+        Assert.All(details, detail => Assert.Equal(TextExtractionStatus.TooLarge, detail.Status));
+        Assert.Equal(files.Count, result.SkippedFiles[TextExtractionStatus.TooLarge]);
+        Assert.Equal(files.Count, result.StoredFiles);
+        Assert.Equal(files.Count, (await store.SearchAsync("large", 500, Token)).Count);
+    }
+
+    [Fact]
+    public async Task NewIndexBatchesDoNotRetainDiagnosticSamplesFromPreviousBatches()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var bad = await WriteFile("large.txt", Encoding.UTF8.GetBytes("oversized"));
+        var first = await store.IndexScanAsync([bad], new PlainTextExtractor(1), cancellationToken: Token);
+        Assert.Single(first.SkippedFileDetails!);
+        var good = await WriteFile("good.txt", Encoding.UTF8.GetBytes("ready"));
+
+        var second = await store.IndexScanAsync([good], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        Assert.Empty(second.SkippedFileDetails!);
+        Assert.Empty(second.SkippedFiles);
+        Assert.Equal(2, second.StoredFiles);
+        Assert.Equal(1, second.StoredTextFiles);
+    }
+
+    [Fact]
     public async Task UnchangedTextIsReusedAndChangedTextIsReplaced()
     {
         var store = CreateStore();

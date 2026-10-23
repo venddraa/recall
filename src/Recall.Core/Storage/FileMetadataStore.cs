@@ -261,6 +261,7 @@ public sealed class FileMetadataStore
         searchCommand.Prepare();
         var extracted = 0;
         var skipped = new Dictionary<TextExtractionStatus, int>();
+        var skippedDetails = new List<SkippedFileDetail>();
         var processed = 0;
         var timer = Stopwatch.StartNew();
 
@@ -309,6 +310,11 @@ public sealed class FileMetadataStore
                 else
                 {
                     skipped[result.Status] = skipped.GetValueOrDefault(result.Status) + 1;
+                    // Unsupported formats are summarized by count. Bound diagnostic samples
+                    // independently of the total number of files; never retain document text.
+                    if (result.Status != TextExtractionStatus.Unsupported
+                        && skippedDetails.Count < TextIndexResult.MaximumSkippedFileDetails)
+                        skippedDetails.Add(new((string)pathParameter.Value, result.Status));
                     Trace.TraceInformation("File content skipped ({0}): {1}", result.Status, file.FullPath);
                 }
                 processed++;
@@ -339,7 +345,8 @@ public sealed class FileMetadataStore
         cancellationToken.ThrowIfCancellationRequested();
         transaction.Commit();
         Trace.TraceInformation("Metadata batch committed; {0} files stored in total; {1} stale index entries removed.", count, removed);
-        return new TextIndexResult(count, textCount, extracted, skipped, removed, cleanupSkippedFolders);
+        return new TextIndexResult(count, textCount, extracted, skipped, removed, cleanupSkippedFolders,
+            skippedDetails.AsReadOnly());
     }
 
     private static int RemoveMissingFiles(SqliteConnection connection, SqliteTransaction transaction,

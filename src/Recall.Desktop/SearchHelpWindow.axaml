@@ -27,6 +27,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="If only the filename matches, the preview explains why content is unavailable. To reread file contents, choose Index → Indexed Folders, select the folder, then Reindex Folder."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. The report is available during the current session; automatic updates afterward are not included."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="Keyboard shortcuts" FontWeight="Bold" Margin="0,6,0,0" />
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
                         <TextBlock Text="Ctrl+F" />

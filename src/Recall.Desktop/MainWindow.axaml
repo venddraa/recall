@@ -30,6 +30,9 @@
                               IsEnabled="False" Click="ScanFolders_OnClick" />
                     <MenuItem x:Name="CancelScanMenuItem" Header="Cancel Scan"
                               IsEnabled="False" Click="CancelScan_OnClick" />
+                    <Separator />
+                    <MenuItem x:Name="LastCompletedScanMenuItem" Header="Last Completed Scan..."
+                              IsEnabled="False" Click="LastCompletedScan_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Tools">
                     <MenuItem x:Name="SettingsMenuItem" Header="Settings..." IsEnabled="False"

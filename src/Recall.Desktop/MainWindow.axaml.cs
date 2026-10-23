@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private bool _copyingPath;
     private bool _openingFile;
     private bool _openingFolder;
+    private CompletedScanReport? _lastCompletedScan;
 
     public MainWindow()
     {
@@ -147,7 +148,13 @@ public partial class MainWindow : Window
                 return;
             var dialog = new IndexedFoldersWindow(_folderStore, _folders, canReindex: _databaseReady);
             await dialog.ShowDialog(this);
-            _folders = dialog.Folders;
+            var folders = dialog.Folders;
+            if (!_folders.SequenceEqual(folders, StringComparer.Ordinal))
+            {
+                _lastCompletedScan = null;
+                this.FindControl<MenuItem>("LastCompletedScanMenuItem")!.IsEnabled = false;
+            }
+            _folders = folders;
             reindexFolder = dialog.RequestedReindexFolder;
             await RestartMonitoringAsync();
             if (IsVisible)
@@ -261,18 +268,22 @@ public partial class MainWindow : Window
             _storedFileCount = saved.StoredFiles;
             _textFileCount = saved.StoredTextFiles;
             scanSaved = true;
+            var summary = (forceTextExtraction
+                    ? $"Text reread: {saved.ExtractedFiles:N0} files.\n"
+                    : $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n")
+                + FormatSkippedContent(saved)
+                + $"\nStale index entries removed: {saved.RemovedFiles:N0}; cleanup skipped for {saved.CleanupSkippedFolders:N0} folders with scan errors."
+                + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped.";
+            _lastCompletedScan = new(DateTime.UtcNow, operation, roots.ToArray(), result.Files.Count,
+                summary, result.Failures.Take(CompletedScanReport.MaximumScannerDetails).ToArray(),
+                saved.SkippedFileDetails ?? []);
             if (IsVisible)
             {
                 this.FindControl<TextBlock>("StoredFileCountText")!.Text = $"Stored files: {_storedFileCount:N0}";
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = $"{operation} saved: {result.Files.Count:N0} files";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    (forceTextExtraction
-                        ? $"Text reread: {saved.ExtractedFiles:N0} files.\n"
-                        : $"Text ready: {saved.ExtractedFiles:N0} files (including unchanged files).\n")
-                    + FormatSkippedContent(saved)
-                    + $"\nStale index entries removed: {saved.RemovedFiles:N0}; cleanup skipped for {saved.CleanupSkippedFolders:N0} folders with scan errors."
-                    + $"\nScan: {result.Failures.Count:N0} unavailable entries; {result.SkippedLinks:N0} symbolic links skipped."
-                    + "\nEnter words you remember; results appear when you pause typing.";
+                    summary + "\nEnter words you remember; results appear when you pause typing."
+                    + "\nChoose Index → Last Completed Scan to review the details.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text files: {_textFileCount:N0} (complete)";
             }
         }
@@ -350,6 +361,7 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = !scanning && _settingsStore is not null;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
+        this.FindControl<MenuItem>("LastCompletedScanMenuItem")!.IsEnabled = !scanning && _lastCompletedScan is not null;
         this.FindControl<TextBox>("SearchBox")!.IsEnabled = !scanning;
         UpdateSearchButtons();
     }
@@ -362,6 +374,12 @@ public partial class MainWindow : Window
     private async void About_OnClick(object? sender, RoutedEventArgs e)
     {
         await new AboutWindow().ShowDialog(this);
+    }
+
+    private async void LastCompletedScan_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_scanCancellation is null && _lastCompletedScan is { } report)
+            await new ScanReportWindow(report).ShowDialog(this);
     }
 
     private async void SearchHelp_OnClick(object? sender, RoutedEventArgs e) => await ShowSearchHelpAsync();
