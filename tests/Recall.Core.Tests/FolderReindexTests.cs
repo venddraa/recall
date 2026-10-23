@@ -63,6 +63,45 @@ public sealed class FolderReindexTests : IDisposable
     }
 
     [Fact]
+    public async Task ManualScanOfOneFolderReusesTextAndReconcilesOnlyItsOwnFiles()
+    {
+        var parent = WriteFile(Path.Combine(Root, "parent.txt"), "parentcached");
+        var selectedRoot = Path.Combine(Root, "nested");
+        var unchanged = WriteFile(Path.Combine(selectedRoot, "unchanged.txt"), "unchangedcached");
+        var changed = WriteFile(Path.Combine(selectedRoot, "changed.txt"), "oldnested");
+        var removed = WriteFile(Path.Combine(selectedRoot, "removed.txt"), "deletedcached");
+        var sibling = WriteFile(Path.Combine(Root, "nested-backup", "sibling.txt"), "siblingcached");
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        await Scan(store, Root);
+        var beforeParent = await store.GetFileAsync(parent.FullPath, Token);
+        var beforeSibling = await store.GetFileAsync(sibling.FullPath, Token);
+        WriteFile(parent.FullPath, "parentchangednotselected");
+        WriteFile(sibling.FullPath, "siblingchangednotselected");
+        WriteFile(changed.FullPath, "updatednestedcontent");
+        File.Delete(removed.FullPath);
+        var extractor = new RecordingExtractor(_extractor);
+
+        var result = await Scan(store, selectedRoot, extractor: extractor);
+
+        Assert.Equal(new[] { changed.FullPath }, extractor.ExtractedPaths);
+        Assert.Equal(2, result.ExtractedFiles);
+        Assert.Equal(1, result.RemovedFiles);
+        Assert.Equal(4, result.StoredFiles);
+        Assert.Equal(beforeParent, await store.GetFileAsync(parent.FullPath, Token));
+        Assert.Equal(beforeSibling, await store.GetFileAsync(sibling.FullPath, Token));
+        Assert.Null(await store.GetFileAsync(removed.FullPath, Token));
+        Assert.Equal(unchanged.FullPath, Assert.Single(await store.SearchAsync("unchangedcached", cancellationToken: Token)).FullPath);
+        Assert.Single(await store.SearchAsync("updatednestedcontent", cancellationToken: Token));
+        Assert.Single(await store.SearchAsync("parentcached", cancellationToken: Token));
+        Assert.Single(await store.SearchAsync("siblingcached", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("oldnested", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("deletedcached", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("parentchangednotselected", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("siblingchangednotselected", cancellationToken: Token));
+    }
+
+    [Fact]
     public async Task ReindexOfNestedSelectionDoesNotRescanParentOrSiblingFolders()
     {
         var parent = WriteFile(Path.Combine(Root, "parent.txt"), "parentcached");
@@ -239,6 +278,17 @@ public sealed class FolderReindexTests : IDisposable
         Assert.Null(await store.GetFileAsync(outside.FullPath, Token));
         Assert.Single(await store.SearchAsync("originalcontent", cancellationToken: Token));
         Assert.Empty(await store.SearchAsync("privatecontent", cancellationToken: Token));
+    }
+
+    private sealed class RecordingExtractor(ITextExtractor inner) : ITextExtractor
+    {
+        public List<string> ExtractedPaths { get; } = [];
+        public bool CanReuse(ScannedFile file) => inner.CanReuse(file);
+        public TextExtractionResult Extract(ScannedFile file, CancellationToken cancellationToken)
+        {
+            ExtractedPaths.Add(file.FullPath);
+            return inner.Extract(file, cancellationToken);
+        }
     }
 
     private sealed class CancelOnProgress(CancellationTokenSource cancellation) : IProgress<TextIndexProgress>

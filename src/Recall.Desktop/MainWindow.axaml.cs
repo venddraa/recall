@@ -139,14 +139,15 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("IndexedFoldersMenuItem")!.IsEnabled = false;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = false;
         this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = false;
-        string? reindexFolder = null;
+        string? requestedScanFolder = null;
+        var forceTextExtraction = false;
         try
         {
             // Stop before selection changes so removed folders cannot continue being indexed.
             await StopMonitoringAsync();
             if (!IsVisible)
                 return;
-            var dialog = new IndexedFoldersWindow(_folderStore, _folders, canReindex: _databaseReady);
+            var dialog = new IndexedFoldersWindow(_folderStore, _folders, canIndex: _databaseReady);
             await dialog.ShowDialog(this);
             var folders = dialog.Folders;
             if (!_folders.SequenceEqual(folders, StringComparer.Ordinal))
@@ -155,7 +156,8 @@ public partial class MainWindow : Window
                 this.FindControl<MenuItem>("LastCompletedScanMenuItem")!.IsEnabled = false;
             }
             _folders = folders;
-            reindexFolder = dialog.RequestedReindexFolder;
+            requestedScanFolder = dialog.RequestedScanFolder;
+            forceTextExtraction = dialog.ForceTextExtraction;
             await RestartMonitoringAsync();
             if (IsVisible)
             {
@@ -171,8 +173,8 @@ public partial class MainWindow : Window
                 this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = _settingsStore is not null;
             }
         }
-        if (reindexFolder is not null && IsVisible)
-            await ScanFoldersAsync([reindexFolder], forceTextExtraction: true);
+        if (requestedScanFolder is not null && IsVisible)
+            await ScanFoldersAsync([requestedScanFolder], forceTextExtraction);
     }
 
     private void UpdateFolderStatus()
