@@ -8,6 +8,7 @@ public sealed class RecallDataPathTests
     public void AbsoluteXdgDataDirectoryIsUsed()
     {
         Assert.Equal("/custom/data/recall/recall.db", RecallDataPath.GetDatabasePath("/custom/data/", "/home/user"));
+        Assert.Equal("/custom/data/recall/recall.log", RecallDataPath.GetLogFilePath("/custom/data/", "/home/user"));
     }
 
     [Theory]
@@ -17,5 +18,6 @@ public sealed class RecallDataPathTests
     public void MissingOrRelativeXdgDirectoryFallsBackToHome(string? dataHome)
     {
         Assert.Equal("/home/user/.local/share/recall/recall.db", RecallDataPath.GetDatabasePath(dataHome, "/home/user"));
+        Assert.Equal("/home/user/.local/share/recall/recall.log", RecallDataPath.GetLogFilePath(dataHome, "/home/user"));
     }
 }

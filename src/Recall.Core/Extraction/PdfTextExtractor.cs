@@ -58,8 +58,7 @@ internal sealed class PdfTextExtractor(int maximumFileBytes, int maximumTextChar
         }
         catch (Exception exception) when (exception is not (OperationCanceledException or OutOfMemoryException))
         {
-            Trace.TraceWarning("PDF parsing failed for {0}: {1}: {2}", file.FullPath,
-                exception.GetType().Name, exception.Message);
+            Trace.TraceWarning("PDF parsing failed for {0}: {1}", file.FullPath, exception.GetType().Name);
             return new(TextExtractionStatus.ParserFailed);
         }
     }

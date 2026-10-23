@@ -37,6 +37,9 @@
                 <MenuItem Header="_Tools">
                     <MenuItem x:Name="SettingsMenuItem" Header="Settings..." IsEnabled="False"
                               Click="Settings_OnClick" />
+                    <Separator />
+                    <MenuItem x:Name="OpenLogFolderMenuItem" Header="Open Log Folder"
+                              Click="OpenLogFolder_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Help">
                     <MenuItem Header="_Search Tips..." InputGesture="F1" Click="SearchHelp_OnClick" />

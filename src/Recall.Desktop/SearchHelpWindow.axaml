@@ -29,6 +29,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. The report is available during the current session; automatic updates afterward are not included."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="For troubleshooting across restarts, choose Tools → Open Log Folder. Application warnings and errors are stored locally in recall.log, with one rotated backup recall.log.1. Logs may contain file paths; document contents are not recorded."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="Keyboard shortcuts" FontWeight="Bold" Margin="0,6,0,0" />
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
                         <TextBlock Text="Ctrl+F" />
