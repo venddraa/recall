@@ -102,10 +102,83 @@ public sealed class TextIndexingTests : IDisposable
         }
         await store.IndexScanAsync([file], extractor, cancellationToken: Token);
         Assert.Equal("2000-01-01T00:00:00.0000000Z", ReadField(store, file.FullPath, "processed_at_utc"));
+        Assert.Single(await store.SearchAsync("before", cancellationToken: Token));
         var updated = await WriteFile("notes.txt", Encoding.UTF8.GetBytes("after - different"));
         await store.IndexScanAsync([updated], extractor, cancellationToken: Token);
         Assert.Equal("after - different", ReadField(store, file.FullPath, "content"));
         Assert.Equal(1, await store.GetFileCountAsync(Token));
+        Assert.Empty(await store.SearchAsync("before", cancellationToken: Token));
+        Assert.Single(await store.SearchAsync("after different", cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task UnchangedScanDoesNotWriteToTheSearchIndex()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", Encoding.UTF8.GetBytes("remembered content"));
+        var extractor = new PlainTextExtractor(1024);
+        await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+        using (var connection = Connect(store))
+        {
+            using var command = connection.CreateCommand();
+            const string probe = "INSERT INTO file_search(rowid, filename, content) VALUES (999, 'probe', 'probe');";
+            command.CommandText = probe;
+            command.ExecuteNonQuery();
+            command.CommandText = "DELETE FROM file_search WHERE rowid = 999;";
+            command.ExecuteNonQuery();
+            // Instrument only this test database. FTS5 stores ordinary table content here;
+            // rejecting inserts proves an unchanged scan avoids rewriting the FTS row.
+            command.CommandText = """
+                CREATE TRIGGER reject_search_rewrite BEFORE INSERT ON file_search_content
+                BEGIN SELECT RAISE(ABORT, 'unexpected FTS write'); END;
+                """;
+            command.ExecuteNonQuery();
+            // Positive control: ensure the guard actually intercepts virtual-table writes.
+            command.CommandText = probe;
+            var error = Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
+            Assert.Equal(19, error.SqliteErrorCode);
+        }
+
+        var root = Path.GetDirectoryName(file.FullPath)!;
+        var scan = await new FileScanner().ScanAsync([root], cancellationToken: Token);
+        var result = await store.SynchronizeScanAsync(scan, [root], extractor, cancellationToken: Token);
+
+        Assert.Equal(1, result.StoredFiles);
+        Assert.Equal(1, result.StoredTextFiles);
+        Assert.Equal(0, result.RemovedFiles);
+        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync("remembered content", cancellationToken: Token)).FullPath);
+        Assert.Equal("remembered content", await File.ReadAllTextAsync(file.FullPath, Token));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CachedTextRepairsMissingOrMismatchedSearchEntries(bool wrongFilename)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", Encoding.UTF8.GetBytes("remembered content"));
+        var extractor = new PlainTextExtractor(1024);
+        await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+        using (var connection = Connect(store))
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE file_text SET processed_at_utc = '2000-01-01T00:00:00.0000000Z';";
+            command.ExecuteNonQuery();
+            command.CommandText = wrongFilename
+                ? "UPDATE file_search SET filename = 'obsoletefilename.txt';"
+                : "DELETE FROM file_search;";
+            command.ExecuteNonQuery();
+        }
+        Assert.Empty(await store.SearchAsync("notes", cancellationToken: Token));
+
+        await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+
+        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync("notes", cancellationToken: Token)).FullPath);
+        Assert.Single(await store.SearchAsync("remembered content", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("obsoletefilename", cancellationToken: Token));
+        Assert.Equal("2000-01-01T00:00:00.0000000Z", ReadField(store, file.FullPath, "processed_at_utc"));
     }
 
     [Fact]

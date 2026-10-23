@@ -223,13 +223,17 @@ public sealed class FileMetadataStore
         using var reuseCommand = connection.CreateCommand();
         reuseCommand.Transaction = transaction;
         reuseCommand.CommandText = """
-            SELECT COUNT(*) FROM file_metadata AS m JOIN file_text AS t ON t.file_id = m.id
+            SELECT EXISTS (
+                SELECT 1 FROM file_search AS s
+                WHERE s.rowid = m.id AND s.filename = $filename)
+            FROM file_metadata AS m JOIN file_text AS t ON t.file_id = m.id
             WHERE m.full_path = $path AND m.size = $size AND m.modified_at_utc = $modified
                 AND t.status = 'Extracted';
             """;
         var reusePath = reuseCommand.Parameters.Add("$path", SqliteType.Text);
         var reuseSize = reuseCommand.Parameters.Add("$size", SqliteType.Integer);
         var reuseModified = reuseCommand.Parameters.Add("$modified", SqliteType.Text);
+        var reuseFilename = reuseCommand.Parameters.Add("$filename", SqliteType.Text);
         reuseCommand.Prepare();
         using var invalidateCommand = connection.CreateCommand();
         invalidateCommand.Transaction = transaction;
@@ -276,9 +280,17 @@ public sealed class FileMetadataStore
             reusePath.Value = invalidatePath.Value = pathParameter.Value;
             reuseSize.Value = invalidateSize.Value = sizeParameter.Value;
             reuseModified.Value = invalidateModified.Value = modifiedParameter.Value;
-            var reuse = !forceTextExtraction && extractor is not null
-                && Convert.ToInt64(reuseCommand.ExecuteScalar(), CultureInfo.InvariantCulture) > 0
-                && extractor.CanReuse(file);
+            reuseFilename.Value = file.Filename;
+            var reuse = false;
+            var searchUnchanged = false;
+            if (!forceTextExtraction && extractor is not null)
+            {
+                using var reader = reuseCommand.ExecuteReader();
+                reuse = reader.Read() && extractor.CanReuse(file);
+                // Reuse valid text without rewriting FTS, but repair missing or mismatched
+                // search rows. Dispose the reader before any writes on this connection.
+                searchUnchanged = reuse && reader.GetBoolean(0);
+            }
             invalidateCommand.ExecuteNonQuery();
             command.ExecuteNonQuery();
             if (extractor is not null)
@@ -307,8 +319,11 @@ public sealed class FileMetadataStore
                 }
             }
 
-            searchPath.Value = pathParameter.Value;
-            searchCommand.ExecuteNonQuery();
+            if (!searchUnchanged)
+            {
+                searchPath.Value = pathParameter.Value;
+                searchCommand.ExecuteNonQuery();
+            }
         }
 
         removed += completeRoots is { Length: > 0 }
