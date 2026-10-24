@@ -31,7 +31,7 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="If only the filename matches, the preview explains why content is unavailable. To reread file contents, choose Index → Indexed Folders, select the folder, then Reindex Folder."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. The report is available during the current session; automatic updates afterward are not included."
+                    <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. Use Copy Report to copy the displayed report, including full paths and issue reasons. The report is available during the current session; automatic updates afterward are not included."
                                TextWrapping="Wrap" />
                     <TextBlock Text="For troubleshooting across restarts, choose Tools → Open Log Folder. Application warnings and errors are stored locally in recall.log, with one rotated backup recall.log.1. Logs may contain file paths; document contents are not recorded."
                                TextWrapping="Wrap" />

@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Recall.Core.Extraction;
 using Recall.Core.Scanning;
 using Recall.Core.Storage;
@@ -22,22 +25,30 @@ public sealed record ScanIssueRow(string FullPath, string Reason)
 
 public partial class ScanReportWindow : Window
 {
+    private readonly string? _reportText;
+
     public ScanReportWindow() => AvaloniaXamlLoader.Load(this);
 
     internal ScanReportWindow(CompletedScanReport report) : this()
     {
-        this.FindControl<TextBlock>("ReportHeadingText")!.Text =
-            $"{report.Operation} completed {report.CompletedAtUtc.ToLocalTime():g} — {report.FoundFiles:N0} files found";
-        this.FindControl<TextBox>("SummaryText")!.Text =
-            "Folders:\n" + string.Join("\n", report.Folders) + "\n\n" + report.Summary;
+        var heading = $"{report.Operation} completed {report.CompletedAtUtc.ToLocalTime():g} — {report.FoundFiles:N0} files found";
+        this.FindControl<TextBlock>("ReportHeadingText")!.Text = heading;
+        var summary = "Folders:\n" + string.Join("\n", report.Folders) + "\n\n" + report.Summary;
+        this.FindControl<TextBox>("SummaryText")!.Text = summary;
         var rows = report.ScannerFailures.Select(failure => new ScanIssueRow(failure.Path, failure.Message))
             .Concat(report.SkippedFiles.Select(file => new ScanIssueRow(file.FullPath, Describe(file.Status)))).ToArray();
         var list = this.FindControl<ListBox>("IssuesList")!;
         list.ItemsSource = rows;
         this.FindControl<TextBlock>("EmptyIssuesText")!.IsVisible = rows.Length == 0;
-        this.FindControl<TextBlock>("ReportNoteText")!.Text =
+        var note =
             $"Samples: up to {CompletedScanReport.MaximumScannerDetails} scanner issues and {TextIndexResult.MaximumSkippedFileDetails} content skips. Unsupported formats and scanner-skipped links are summarized above.\n"
             + "This report covers the last completed scan in this session. Later automatic updates are not included.";
+        this.FindControl<TextBlock>("ReportNoteText")!.Text = note;
+        var issues = rows.Length == 0 ? "No detailed issues were recorded."
+            : string.Join("\n\n", rows.Select(row => row.FullPath + "\n" + row.Reason));
+        // Keep the copied report tied to the same snapshot displayed by this dialog.
+        _reportText = heading + "\n\n" + summary + "\n\nSample issues:\n" + issues + "\n\n" + note;
+        this.FindControl<Button>("CopyReportButton")!.IsEnabled = true;
         if (rows.Length > 0)
             list.SelectedIndex = 0;
     }
@@ -61,6 +72,40 @@ public partial class ScanReportWindow : Window
         if (details is not null)
             details.Text = (sender as ListBox)?.SelectedItem is ScanIssueRow row
                 ? row.FullPath + "\n" + row.Reason : "Select an issue to see its full path and reason.";
+    }
+
+    private async void CopyReport_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var button = this.FindControl<Button>("CopyReportButton")!;
+        if (!button.IsEnabled || _reportText is not { } text)
+            return;
+        var status = this.FindControl<TextBlock>("CopyStatusText")!;
+        button.IsEnabled = false;
+        status.Foreground = Brushes.Black;
+        status.Text = "Copying report...";
+        try
+        {
+            // The owner stays open when the report dialog closes.
+            var clipboard = Owner?.Clipboard ?? Clipboard
+                ?? throw new InvalidOperationException("Clipboard is unavailable.");
+            await clipboard.SetTextAsync(text);
+            if (IsVisible)
+                status.Text = "Report copied";
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning("Could not copy the scan report: {0}", exception.GetType().Name);
+            if (IsVisible)
+            {
+                status.Foreground = Brushes.DarkRed;
+                status.Text = "Could not copy report. Try again.";
+            }
+        }
+        finally
+        {
+            if (IsVisible)
+                button.IsEnabled = true;
+        }
     }
 
     private void Close_OnClick(object? sender, RoutedEventArgs e) => Close();
