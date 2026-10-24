@@ -97,6 +97,57 @@ public sealed class FileSearchTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CombiningAccentsDoNotChangeShortWordOrPrefixMatching(bool matchFilename)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var exact = await WriteFile(matchFilename ? "BA.bin" : "short.txt", matchFilename ? "unsupported" : "BA");
+        var longer = await WriteFile(matchFilename ? "BAPP.bin" : "long.txt", matchFilename ? "unsupported" : "BAPP");
+        await store.IndexScanAsync([exact, longer], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        foreach (var query in new[] { "BA", "BÁ", "BA\u0301", "BA\u0301\u0308" })
+        {
+            var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+            Assert.Equal(exact.FullPath, result.FullPath);
+        }
+        foreach (var query in new[] { "BAP", "BÁP", "BA\u0301P" })
+        {
+            var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+            Assert.Equal(longer.FullPath, result.FullPath);
+        }
+    }
+
+    [Theory]
+    [InlineData("\u0301 café")]
+    [InlineData("café \u0308")]
+    [InlineData("\u0301 café \u0308")]
+    public async Task StrayAccentMarksDoNotHideValidWordsOrAlterSnippetText(string query)
+    {
+        const string content = "Café déjà vu";
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", content);
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+
+        Assert.Equal(file.FullPath, result.FullPath);
+        Assert.Equal(content, result.Snippet);
+        Assert.Equal("Café", Assert.Single(result.SnippetParts!, part => part.IsMatch).Text);
+    }
+
+    [Fact]
+    public async Task StandaloneAccentMarksReturnNoResultsWithoutOpeningTheDatabase()
+    {
+        var store = CreateStore();
+
+        Assert.Empty(await store.SearchAsync("\u0301 \u0903\u20DD", cancellationToken: Token));
+        Assert.False(File.Exists(store.DatabasePath));
+    }
+
+    [Theory]
     [InlineData("The CLEAR-sky index transformation is used.", "clear sky index", "CLEAR|sky|index")]
     [InlineData("Dokumen BAPP dan ABAPP selesai.", "BAP", "BAPP")]
     [InlineData("Café déjà vu", "CAFE DEJA", "Café|déjà")]

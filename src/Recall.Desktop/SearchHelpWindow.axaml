@@ -16,7 +16,7 @@
                     <TextBlock Text="Search rules" FontWeight="Bold" Margin="0,6,0,0" />
                     <TextBlock Text="Every word must match the filename or indexed content, in any order. For example, clear sky index can match clear-sky index. Quotes do not request an exact phrase."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Words with 3 or more characters also match word beginnings: BAP finds BAPP. Words with 1 or 2 characters match whole words. Search ignores letter case; café also matches cafe."
+                    <TextBlock Text="Words with 3 or more letters or digits also match word beginnings: BAP finds BAPP. Words with 1 or 2 letters or digits match whole words. Accents do not add extra letters; stray accent marks are ignored. Search ignores letter case; café also matches cafe."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Results are shown in pages of 100 files. Use Previous and Next below the list to see other pages, or add more words to narrow the search. A new query starts on page 1. Select a result to see its matching text, or double-click it to open the file."
                                TextWrapping="Wrap" />

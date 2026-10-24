@@ -10,7 +10,7 @@ public static class SearchQuery
         ArgumentNullException.ThrowIfNull(query);
         var terms = new List<string>();
         var current = new StringBuilder();
-        var characterCount = 0;
+        var letterOrDigitCount = 0;
 
         void CompleteTerm()
         {
@@ -20,21 +20,24 @@ public static class SearchQuery
             }
 
             var term = $"\"{current}\"";
-            terms.Add(characterCount >= 3 ? term + "*" : term);
+            terms.Add(letterOrDigitCount >= 3 ? term + "*" : term);
             current.Clear();
-            characterCount = 0;
+            letterOrDigitCount = 0;
         }
 
         foreach (var rune in query.EnumerateRunes())
         {
-            var category = Rune.GetUnicodeCategory(rune);
-            if (Rune.IsLetterOrDigit(rune)
-                || category is UnicodeCategory.NonSpacingMark
-                    or UnicodeCategory.SpacingCombiningMark
-                    or UnicodeCategory.EnclosingMark)
+            if (Rune.IsLetterOrDigit(rune))
             {
                 current.Append(rune);
-                characterCount++;
+                letterOrDigitCount++;
+            }
+            else if (current.Length > 0 && Rune.GetUnicodeCategory(rune) is
+                UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
+            {
+                // Marks extend an existing word; they cannot create an empty FTS
+                // term or turn a two-letter word into a three-letter prefix.
+                current.Append(rune);
             }
             else
             {
