@@ -125,6 +125,16 @@ internal sealed class NotebookTextExtractor(int maximumFileBytes, int maximumTex
                         if (data.TryGetProperty("text/plain", out var plainText))
                             AppendBlock(plainText);
                         break;
+                    case "error":
+                        if (!output.TryGetProperty("ename", out var errorName) || errorName.ValueKind != JsonValueKind.String
+                            || !output.TryGetProperty("evalue", out var errorValue) || errorValue.ValueKind != JsonValueKind.String)
+                            throw new InvalidDataException("The notebook error name or message is missing or invalid.");
+                        // Store the plain error summary. Traceback frames can duplicate the
+                        // message and contain terminal formatting; they are not indexed.
+                        AppendBlock(errorName);
+                        Append(": ");
+                        Append(errorValue.GetString()!);
+                        break;
                 }
             }
         }

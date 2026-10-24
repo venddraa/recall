@@ -27,6 +27,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="DOCX content includes the document body, referenced headers and footers, footnotes, and endnotes. Reindex Folder to include these sections in documents indexed by an earlier version of Recall."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="IPYNB content includes cell source, plain-text outputs, and saved error names and messages, such as NameError. Traceback frames are not indexed. Reindex Folder to include error summaries in notebooks indexed by an earlier version."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="If only the filename matches, the preview explains why content is unavailable. To reread file contents, choose Index → Indexed Folders, select the folder, then Reindex Folder."
                                TextWrapping="Wrap" />
                     <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. The report is available during the current session; automatic updates afterward are not included."

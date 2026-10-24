@@ -87,6 +87,94 @@ public sealed class NotebookTextExtractorTests : IDisposable
     }
 
     [Fact]
+    public async Task ErrorNameAndMessageAreSearchableWithSnippetsWithoutTracebackFrames()
+    {
+        var file = WriteNotebook([
+            Cell("code", "calculate()", [
+                new { output_type = "stream", name = "stdout", text = "starting calculation" },
+                new { output_type = "error", ename = "NameError", evalue = "name 'hasil_uji7421' is not defined",
+                    traceback = new[] { "\u001b[31mtracebackonlyframe\u001b[0m" } }
+            ])
+        ]);
+        var before = await File.ReadAllBytesAsync(file.FullPath, Token);
+        var extracted = _extractor.Extract(file, Token);
+        Assert.Equal(TextExtractionStatus.Extracted, extracted.Status);
+        Assert.Equal("calculate()\nstarting calculation\nNameError: name 'hasil_uji7421' is not defined", extracted.Text);
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+
+        await store.IndexScanAsync([file], _extractor, cancellationToken: Token);
+
+        foreach (var query in new[] { "NameError", "hasil_uji7421", "name hasil uji7421 is not defined" })
+        {
+            var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+            Assert.Equal(file.FullPath, result.FullPath);
+            Assert.Contains("NameError: name 'hasil_uji7421' is not defined", result.Snippet);
+            Assert.Contains(result.SnippetParts!, part => part.IsMatch);
+        }
+        Assert.Empty(await store.SearchAsync("tracebackonlyframe", cancellationToken: Token));
+        Assert.Equal(before, await File.ReadAllBytesAsync(file.FullPath, Token));
+        Assert.Equal(file.ModifiedAtUtc, File.GetLastWriteTimeUtc(file.FullPath));
+    }
+
+    [Theory]
+    [InlineData("KeyboardInterrupt", "", "KeyboardInterrupt: ")]
+    [InlineData("ValueError", "nilai café\r\nbaris kedua", "ValueError: nilai café\nbaris kedua")]
+    public void ReadsEmptyAndMultilineUnicodeErrorMessages(string name, string message, string expected)
+    {
+        var file = WriteNotebook([Cell("code", "", [
+            new { output_type = "error", ename = name, evalue = message, traceback = Array.Empty<string>() }
+        ])]);
+
+        var result = _extractor.Extract(file, Token);
+
+        Assert.Equal(TextExtractionStatus.Extracted, result.Status);
+        Assert.Equal(expected, result.Text);
+    }
+
+    [Theory]
+    [InlineData("{\"output_type\":\"error\",\"evalue\":\"message\"}")]
+    [InlineData("{\"output_type\":\"error\",\"ename\":\"NameError\"}")]
+    [InlineData("{\"output_type\":\"error\",\"ename\":null,\"evalue\":\"message\"}")]
+    [InlineData("{\"output_type\":\"error\",\"ename\":[\"NameError\"],\"evalue\":\"message\"}")]
+    [InlineData("{\"output_type\":\"error\",\"ename\":\"NameError\",\"evalue\":null}")]
+    [InlineData("{\"output_type\":\"error\",\"ename\":\"NameError\",\"evalue\":42}")]
+    public async Task InvalidErrorFieldsKeepFilenameSearchAndDoNotStopOtherFiles(string output)
+    {
+        var broken = WriteJson($$"""
+            {"nbformat":4,"cells":[{"cell_type":"code","source":"partialsourceonly","outputs":[{{output}}]}]}
+            """);
+        var good = WriteNotebook([Cell("markdown", "valid remaining contents")], "good.ipynb");
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+
+        var indexed = await store.IndexScanAsync([broken, good], _extractor, cancellationToken: Token);
+
+        Assert.Equal(1, indexed.SkippedFiles[TextExtractionStatus.ParserFailed]);
+        var result = Assert.Single(await store.SearchAsync("notes", cancellationToken: Token));
+        Assert.Equal(broken.FullPath, result.FullPath);
+        Assert.Equal(TextExtractionStatus.ParserFailed, result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
+        Assert.Empty(await store.SearchAsync("partialsourceonly", cancellationToken: Token));
+        Assert.Equal(good.FullPath, Assert.Single(await store.SearchAsync("valid remaining contents", cancellationToken: Token)).FullPath);
+    }
+
+    [Theory]
+    [InlineData(21, TextExtractionStatus.TooLarge)]
+    [InlineData(22, TextExtractionStatus.Extracted)]
+    public void ExtractedTextLimitIncludesErrorNameMessageAndSeparators(int limit, TextExtractionStatus expectedStatus)
+    {
+        var file = WriteNotebook([Cell("code", "calc()", [
+            new { output_type = "error", ename = "ValueError", evalue = "bad", traceback = Array.Empty<string>() }
+        ])]);
+
+        var result = new FileTextExtractor(1024, 1024 * 1024, limit).Extract(file, Token);
+
+        Assert.Equal(expectedStatus, result.Status);
+        Assert.Equal(expectedStatus == TextExtractionStatus.Extracted ? "calc()\nValueError: bad" : null, result.Text);
+    }
+
+    [Fact]
     public async Task MetadataImagesAttachmentsAndHtmlAreNotIndexed()
     {
         var file = WriteJson("""
