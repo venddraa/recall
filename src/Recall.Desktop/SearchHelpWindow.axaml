@@ -25,6 +25,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="Content search supports plain-text files up to 5 MiB, and text-layer PDFs, DOCX documents and IPYNB notebooks up to 20 MiB. Scanned images are not read as text. Files whose contents cannot be indexed can still match their names."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="DOCX content includes the document body, referenced headers and footers, footnotes, and endnotes. Reindex Folder to include these sections in documents indexed by an earlier version of Recall."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="If only the filename matches, the preview explains why content is unavailable. To reread file contents, choose Index → Indexed Folders, select the folder, then Reindex Folder."
                                TextWrapping="Wrap" />
                     <TextBlock Text="After a scan, choose Index → Last Completed Scan to review its summary and sample issues. The report is available during the current session; automatic updates afterward are not included."
