@@ -19,6 +19,12 @@ public partial class MainWindow
             await ShowSearchHelpAsync();
             return;
         }
+        if (e.KeyModifiers == KeyModifiers.Control && e.Key is Key.PageDown or Key.PageUp)
+        {
+            e.Handled = true;
+            await ChangeSearchPageAsync(next: e.Key == Key.PageDown);
+            return;
+        }
         if (e.Key != Key.F || e.KeyModifiers != KeyModifiers.Control)
             return;
         var searchBox = this.FindControl<TextBox>("SearchBox")!;

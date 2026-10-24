@@ -426,16 +426,28 @@ public partial class MainWindow : Window
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
 
-    private async void PreviousPage_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (_searchPage > 0 && _searchCancellation is null && _scanCancellation is null)
-            await RunSearchAsync(page: _searchPage - 1);
-    }
+    private async void PreviousPage_OnClick(object? sender, RoutedEventArgs e) => await ChangeSearchPageAsync(next: false);
 
-    private async void NextPage_OnClick(object? sender, RoutedEventArgs e)
+    private async void NextPage_OnClick(object? sender, RoutedEventArgs e) => await ChangeSearchPageAsync(next: true);
+
+    private async Task ChangeSearchPageAsync(bool next)
     {
-        if (_hasNextSearchPage && _searchCancellation is null && _scanCancellation is null)
-            await RunSearchAsync(page: _searchPage + 1);
+        var button = this.FindControl<Button>(next ? "NextPageButton" : "PreviousPageButton")!;
+        // Buttons and shortcuts share the same availability rules, including active
+        // searches/scans and the first/last page boundaries.
+        if (!button.IsEnabled)
+            return;
+        CloseResultContextMenu();
+        var list = this.FindControl<ListBox>("ResultsList")!;
+        var hadResultsFocus = list.IsKeyboardFocusWithin;
+        // Keep focus on the list while its old item containers are replaced.
+        if (hadResultsFocus)
+            list.Focus();
+        await RunSearchAsync(page: _searchPage + (next ? 1 : -1));
+        // Do not take focus back if the user switched to search or another control.
+        if (hadResultsFocus && IsVisible && IsActive && list.IsKeyboardFocusWithin
+            && _searchCancellation is null)
+            FocusSearchResults();
     }
 
     private void ClearSearch_OnClick(object? sender, RoutedEventArgs e) => ClearSearch();
@@ -542,7 +554,10 @@ public partial class MainWindow : Window
                 }
             }
             else if (rows.Length > 0)
+            {
                 list.SelectedIndex = 0;
+                list.ScrollIntoView(0);
+            }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

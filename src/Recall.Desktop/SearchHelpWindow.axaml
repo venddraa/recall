@@ -36,7 +36,7 @@
                     <TextBlock Text="For troubleshooting across restarts, choose Tools → Open Log Folder. Application warnings and errors are stored locally in recall.log, with one rotated backup recall.log.1. Logs may contain file paths; document contents are not recorded."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Keyboard shortcuts" FontWeight="Bold" Margin="0,6,0,0" />
-                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
                         <TextBlock Text="Ctrl+F" />
                         <TextBlock Grid.Column="1" Text="Focus and select the search text" TextWrapping="Wrap" />
                         <TextBlock Grid.Row="1" Text="Enter" />
@@ -53,6 +53,10 @@
                         <TextBlock Grid.Row="6" Grid.Column="1" Text="In search: clear the query. In this dialog: close." TextWrapping="Wrap" />
                         <TextBlock Grid.Row="7" Text="F1" />
                         <TextBlock Grid.Row="7" Grid.Column="1" Text="Open Search Tips from the main window" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="8" Text="Ctrl+Page Down" />
+                        <TextBlock Grid.Row="8" Grid.Column="1" Text="Next results page, when Next is enabled" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="9" Text="Ctrl+Page Up" />
+                        <TextBlock Grid.Row="9" Grid.Column="1" Text="Previous results page, when Previous is enabled" TextWrapping="Wrap" />
                     </Grid>
                 </StackPanel>
             </ScrollViewer>

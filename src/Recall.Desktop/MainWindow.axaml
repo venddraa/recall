@@ -131,9 +131,11 @@
                             <TextBlock x:Name="SearchPageText" Text="Page 1" VerticalAlignment="Center" />
                             <Button x:Name="PreviousPageButton" Grid.Column="1" Content="Previous" MinWidth="86"
                                     IsEnabled="False" Click="PreviousPage_OnClick" Margin="8,0,0,0"
+                                    ToolTip.Tip="Previous results page (Ctrl+Page Up)"
                                     AutomationProperties.Name="Previous search results page" />
                             <Button x:Name="NextPageButton" Grid.Column="2" Content="Next" MinWidth="76"
                                     IsEnabled="False" Click="NextPage_OnClick" Margin="8,0,0,0"
+                                    ToolTip.Tip="Next results page (Ctrl+Page Down)"
                                     AutomationProperties.Name="Next search results page" />
                         </Grid>
                     </Border>
