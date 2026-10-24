@@ -239,6 +239,68 @@ public sealed class FileSearchTests : IDisposable
             cancellationToken: Token, offset: int.MaxValue));
     }
 
+    [Fact]
+    public async Task TiedFilenameMatchesKeepTheirOrderAndOwnExtractionStatusAcrossPages()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var files = new List<ScannedFile>();
+        var expectedStatuses = new Dictionary<string, TextExtractionStatus?>();
+        // Reverse creation order and vary only filename case: every selected file has
+        // the same FTS tokens and rank, so path order must resolve the ties.
+        for (var index = 204; index >= 0; index--)
+        {
+            var name = index % 2 == 0 ? "SHARED.bin" : "shared.bin";
+            var file = await WriteFile($"Selected/record-{index:D3}/{name}", "unsupported body");
+            files.Add(file);
+            expectedStatuses[file.FullPath] = (index % 4) switch
+            {
+                0 => null,
+                1 => TextExtractionStatus.Unsupported,
+                2 => TextExtractionStatus.ParserFailed,
+                _ => TextExtractionStatus.Unavailable
+            };
+        }
+        await store.SaveScanAsync(files.Where(file => expectedStatuses[file.FullPath] is null), Token);
+        await store.IndexScanAsync(files.Where(file => expectedStatuses[file.FullPath] is not null),
+            new PlainTextExtractor(1024), cancellationToken: Token);
+        using (var connection = new SqliteConnection($"Data Source={store.DatabasePath};Pooling=False"))
+        {
+            await connection.OpenAsync(Token);
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE file_text SET status = $status
+                WHERE file_id = (SELECT id FROM file_metadata WHERE full_path = $path);
+                """;
+            var status = command.Parameters.Add("$status", SqliteType.Text);
+            var path = command.Parameters.Add("$path", SqliteType.Text);
+            foreach (var file in files.Where(file => expectedStatuses[file.FullPath] is not null))
+            {
+                status.Value = expectedStatuses[file.FullPath]!.Value.ToString();
+                path.Value = file.FullPath;
+                await command.ExecuteNonQueryAsync(Token);
+            }
+        }
+        // A stronger match outside the chosen folder must not consume a page slot.
+        var outside = await WriteFile("SelectedOther/shared-shared.bin", "unsupported body");
+        await store.IndexScanAsync([outside], new PlainTextExtractor(1024), cancellationToken: Token);
+        var root = Path.Combine(_directory, "documents", "Selected");
+        var expectedPaths = files.Select(file => file.FullPath).Order(StringComparer.Ordinal).ToArray();
+        foreach (var offset in new[] { 0, 100, 200, 205 })
+        {
+            var page = await store.SearchFoldersAsync("shared", [root], 101, Token, offset);
+
+            Assert.Equal(expectedPaths.Skip(offset).Take(101), page.Select(result => result.FullPath));
+            foreach (var result in page)
+            {
+                Assert.Equal(expectedStatuses[result.FullPath], result.ExtractionStatus);
+                Assert.Empty(result.Snippet);
+                Assert.Empty(result.SnippetParts!);
+            }
+            Assert.InRange(page.Select(result => result.Rank).Distinct().Count(), 0, 1);
+        }
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(-100)]

@@ -12,7 +12,7 @@ using Recall.Core.Search;
 using Recall.Core.Storage;
 
 // Run from the repository root:
-// dotnet run --file scripts/benchmark.cs --configuration Release -- --files 10000
+// dotnet run --file scripts/benchmark.cs --configuration Release --no-cache -- --files 10000
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 if (args is ["--help"])
 {
@@ -196,7 +196,7 @@ static void Require(bool condition, string message)
 }
 
 static void PrintUsage() => Console.WriteLine(
-    "dotnet run --file scripts/benchmark.cs --configuration Release -- [--files 10000] [--iterations 25]");
+    "dotnet run --file scripts/benchmark.cs --configuration Release --no-cache -- [--files 10000] [--iterations 25]");
 
 sealed record QueryCase(string Label, string Query, string Folder, int ExpectedRows, int Offset = 0);
 

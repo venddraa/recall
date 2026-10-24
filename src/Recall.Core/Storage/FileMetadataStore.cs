@@ -497,13 +497,16 @@ public sealed class FileMetadataStore
             var marker = Guid.NewGuid().ToString("N");
             var matchStart = $"\u001e{marker}:start\u001f";
             var matchEnd = $"\u001e{marker}:end\u001f";
+            // Keep the optional extraction status out of the candidate joins. A scalar
+            // lookup lets SQLite defer reading file_text until a candidate survives
+            // the LIMIT/OFFSET sort, without changing ranking or the FTS snippet cursor.
             command.CommandText = """
                 SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
                     bm25(file_search, 10.0, 1.0) AS rank,
-                    snippet(file_search, 1, $matchStart, $matchEnd, ' … ', 32), t.status
+                    snippet(file_search, 1, $matchStart, $matchEnd, ' … ', 32),
+                    (SELECT t.status FROM file_text AS t WHERE t.file_id = m.id)
                 FROM file_search
                 JOIN file_metadata AS m ON m.id = file_search.rowid
-                LEFT JOIN file_text AS t ON t.file_id = m.id
                 WHERE file_search MATCH $query
                 ORDER BY rank, m.filename COLLATE NOCASE, m.full_path
                 LIMIT $limit OFFSET $offset;

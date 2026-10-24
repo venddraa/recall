@@ -11,13 +11,16 @@ Dari root repository, gunakan SDK yang dipilih `global.json`:
 
 ```bash
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
-dotnet run --file scripts/benchmark.cs --configuration Release -- --files 10000 --iterations 25
+dotnet run --file scripts/benchmark.cs --configuration Release --no-cache -- --files 10000 --iterations 25
 ```
 
 Untuk pemeriksaan singkat, ganti jumlah file menjadi `1000` dan iterasi menjadi `5`.
 Default: 10.000 file, 25 iterasi. Batas argumen: 1–100.000 file dan 5–100 iterasi.
-Gunakan `-- --help` untuk melihat penggunaan. Setelah build pertama, `--no-build`
-bisa ditambahkan sebelum `--` jika source benchmark dan `Recall.Core` belum berubah.
+Gunakan `-- --help` untuk melihat penggunaan. `--no-cache` memaksa build agar
+perubahan pada `Recall.Core` ikut masuk ke binary benchmark; cache file-based app
+pada SDK 10.0.112 dapat tetap memakai salinan library lama walaupun source project
+referensinya sudah berubah. Jika source benchmark dan `Recall.Core` belum berubah,
+`--no-cache` bisa diganti dengan `--no-build` untuk mengulang pengukuran.
 Build pertama dapat menjalankan restore dependency Recall yang sudah ada.
 
 Corpus berupa TXT UTF-8 sintetis, sekitar 1,2 KiB per file, dipecah ke subfolder
@@ -81,3 +84,40 @@ PDF/DOCX/IPYNB, filesystem watcher, ataupun koleksi 750 ribu file. Bandingkan
 perubahan menggunakan jumlah file, iterasi, mesin, build Release, dan beban mesin
 yang sebanding. Untuk perubahan performa berikutnya, simpan output sebelum dan
 sesudah; jangan memakai batas waktu yang rapuh sebagai unit test.
+
+## Optimasi pembacaan status ekstraksi
+
+Pengukuran berikut memakai 100.000 file TXT (112,14 MiB), 25 iterasi per query,
+serta lingkungan dan konfigurasi Release yang sama. Versi sebelum perubahan
+memakai query pada commit `a789ba7`. Kedua proses benchmark dijalankan berurutan,
+masing-masing dengan corpus baru yang isinya sama dan satu pemanasan per query.
+
+Status ekstraksi sebelumnya diambil melalui `LEFT JOIN file_text` untuk setiap
+kandidat yang cocok. Query sekarang memakai scalar subquery berdasarkan primary
+key file. SQLite dapat menunda lookup tersebut sampai kandidat lolos seleksi
+sorting dengan batas `LIMIT/OFFSET`. Cursor FTS5, bobot BM25, filter folder,
+snippet, serta pengurutan nama/path tidak berubah. Tidak ada migrasi database;
+perubahan langsung berlaku pada indeks yang sudah tersimpan.
+
+| Query | p50 sebelum | p50 sesudah | p95 sebelum | p95 sesudah |
+| --- | ---: | ---: | ---: | ---: |
+| Isi langka | 0,58 ms | 0,65 ms | 0,68 ms | 0,83 ms |
+| Isi `clear sky index` | 16,30 ms | 11,32 ms | 16,47 ms | 11,64 ms |
+| Prefix nama `BAP` | 23,82 ms | 14,18 ms | 31,01 ms | 14,73 ms |
+| Isi umum, halaman 1 | 120,60 ms | 89,13 ms | 121,29 ms | 93,09 ms |
+| Isi umum, halaman 2 | 121,62 ms | 91,79 ms | 129,62 ms | 95,48 ms |
+| Isi pada satu subfolder | 24,87 ms | 24,77 ms | 25,23 ms | 25,15 ms |
+| Tanpa hasil | 0,66 ms | 0,64 ms | 1,54 ms | 0,69 ms |
+
+Pada percobaan ini, p50 query isi umum halaman pertama turun sekitar 26%, dan
+prefix nama sekitar 40%. Query langka tidak mendapat keuntungan; selisihnya
+di bawah 0,2 ms dan perlu pengukuran berulang untuk menarik kesimpulan.
+Filter satu subfolder juga hampir tidak berubah. Angka tidak membuktikan
+percepatan yang sama untuk semua query atau koleksi dokumen pribadi.
+
+Eksperimen terpisah membandingkan dua bentuk SQL secara bergantian pada database
+sintetis yang sama dan memastikan seluruh kolom hasil identik, termasuk skor dan
+snippet. Seluruh validasi benchmark aplikasi juga lulus. Test regresi mencakup
+205 file dengan skor sama, perbedaan kapitalisasi nama, beberapa halaman,
+pembatasan folder, serta status ekstraksi yang kosong maupun gagal. Test tidak
+memakai ambang waktu.
