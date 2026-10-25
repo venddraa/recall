@@ -20,6 +20,10 @@
                     <MenuItem x:Name="CopyPathMenuItem" Header="Copy Path" IsEnabled="False"
                               Click="CopyPath_OnClick" />
                     <Separator />
+                    <MenuItem x:Name="RefreshResultsMenuItem" Header="Refresh Results" InputGesture="F5"
+                              IsEnabled="False" Click="RefreshResults_OnClick"
+                              ToolTip.Tip="Refresh this results page from the saved index. To read changed files, use Scan Folders." />
+                    <Separator />
                     <MenuItem Header="E_xit" Click="Exit_OnClick" />
                 </MenuItem>
                 <MenuItem Header="_Index">

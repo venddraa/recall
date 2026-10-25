@@ -19,6 +19,12 @@ public partial class MainWindow
             await ShowSearchHelpAsync();
             return;
         }
+        if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            await RefreshSearchResultsAsync();
+            return;
+        }
         if (e.KeyModifiers == KeyModifiers.Control && e.Key is Key.PageDown or Key.PageUp)
         {
             e.Handled = true;

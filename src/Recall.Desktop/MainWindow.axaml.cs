@@ -426,6 +426,17 @@ public partial class MainWindow : Window
 
     private async void Find_OnClick(object? sender, RoutedEventArgs e) => await RunSearchAsync();
 
+    private async void RefreshResults_OnClick(object? sender, RoutedEventArgs e) => await RefreshSearchResultsAsync();
+
+    private async Task RefreshSearchResultsAsync()
+    {
+        // Share availability checks between the menu and F5. In particular, do
+        // not interrupt a pending search or refresh results for an edited query.
+        if (!this.FindControl<MenuItem>("RefreshResultsMenuItem")!.IsEnabled)
+            return;
+        await RunSearchAsync(refresh: true);
+    }
+
     private async void PreviousPage_OnClick(object? sender, RoutedEventArgs e) => await ChangeSearchPageAsync(next: false);
 
     private async void NextPage_OnClick(object? sender, RoutedEventArgs e) => await ChangeSearchPageAsync(next: true);
@@ -650,6 +661,8 @@ public partial class MainWindow : Window
             && _folders.Count > 0 && IsVisible;
         this.FindControl<Button>("PreviousPageButton")!.IsEnabled = ready && _searchPage > 0;
         this.FindControl<Button>("NextPageButton")!.IsEnabled = ready && _hasNextSearchPage;
+        this.FindControl<MenuItem>("RefreshResultsMenuItem")!.IsEnabled = ready && _displayedQuery is not null
+            && string.Equals(this.FindControl<TextBox>("SearchBox")!.Text, _displayedQuery, StringComparison.Ordinal);
         this.FindControl<TextBlock>("SearchPageText")!.Text = $"Page {_searchPage + 1:N0}";
     }
 
