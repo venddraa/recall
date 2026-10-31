@@ -52,6 +52,9 @@ launcher, tutup Recall lalu jalankan `bash scripts/install-launcher.sh` terlebih
 6. Double-click hasil TXT untuk membukanya dengan aplikasi default. Dari klik
    kanan hasil, coba **Open Containing Folder** dan **Copy Path**. Tempel path
    ke editor teks dan pastikan menunjuk file uji yang dipilih.
+7. Pilih salah satu hasil, buka **Index → Indexed Folders...**, lalu klik Close
+   tanpa mengubah daftar folder. Query, halaman, hasil, dan pilihan file harus
+   tetap sama. Jika hasil pencarianmu memiliki beberapa halaman, ulangi dari halaman kedua.
 
 Untuk menguji PDF dan DOCX, tambahkan dokumen uji `opaque-b.pdf` dan
 `opaque-c.docx` yang berisi kalimat sama ke folder tersebut, lalu pilih

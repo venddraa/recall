@@ -146,6 +146,7 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = false;
         string? requestedScanFolder = null;
         var forceTextExtraction = false;
+        var foldersChanged = false;
         try
         {
             // Stop before selection changes so removed folders cannot continue being indexed.
@@ -155,7 +156,8 @@ public partial class MainWindow : Window
             var dialog = new IndexedFoldersWindow(_folderStore, _folders, canIndex: _databaseReady);
             await dialog.ShowDialog(this);
             var folders = dialog.Folders;
-            if (!_folders.SequenceEqual(folders, StringComparer.Ordinal))
+            foldersChanged = !_folders.SequenceEqual(folders, StringComparer.Ordinal);
+            if (foldersChanged)
             {
                 _lastCompletedScan = null;
                 this.FindControl<MenuItem>("LastCompletedScanMenuItem")!.IsEnabled = false;
@@ -163,11 +165,17 @@ public partial class MainWindow : Window
             _folders = folders;
             requestedScanFolder = dialog.RequestedScanFolder;
             forceTextExtraction = dialog.ForceTextExtraction;
+            // Cancel old-folder searches and clear their results before awaiting
+            // monitoring startup. An unchanged selection keeps its current view.
+            if (foldersChanged && _databaseReady && IsVisible)
+                ResetSearchView("Folder settings updated",
+                    "Choose Index → Scan Folders to reconcile existing files and changes made while folder settings were open.");
             await RestartMonitoringAsync();
             if (IsVisible)
             {
-                UpdateFolderStatus();
-                ResetSearchView("Folder settings updated", "Choose Index → Scan Folders to reconcile existing files and changes made while folder settings were open.");
+                // Do not discard a search the user started while monitoring was
+                // restarting. With no selected folders, show the setup prompt.
+                UpdateFolderStatus(resetSearch: foldersChanged && _folders.Count == 0);
             }
         }
         finally
@@ -180,9 +188,13 @@ public partial class MainWindow : Window
         }
         if (requestedScanFolder is not null && IsVisible)
             await ScanFoldersAsync([requestedScanFolder], forceTextExtraction);
+        else if (foldersChanged && IsVisible && _databaseReady && _folders.Count > 0
+            && _searchCancellation is null && _displayedQuery is null
+            && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
+            await RunSearchAsync();
     }
 
-    private void UpdateFolderStatus()
+    private void UpdateFolderStatus(bool resetSearch = true)
     {
         var hasFolders = _folders.Count > 0;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = hasFolders && _databaseReady;
@@ -198,13 +210,14 @@ public partial class MainWindow : Window
             : "Index: Not configured";
         if (hasFolders)
             UpdateMonitoringStatus();
-        ResetSearchView(hasFolders
-            ? (_storedFileCount > 0 ? "Ready to search" : "No metadata saved yet")
-            : "No folders selected", hasFolders
-            ? (_storedFileCount > 0
-                ? "Enter words you remember; results appear when you pause typing.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
-                : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
-            : "Choose Index → Indexed Folders to add a folder.");
+        if (resetSearch)
+            ResetSearchView(hasFolders
+                ? (_storedFileCount > 0 ? "Ready to search" : "No metadata saved yet")
+                : "No folders selected", hasFolders
+                ? (_storedFileCount > 0
+                    ? "Enter words you remember; results appear when you pause typing.\nOnly your currently selected folders are searched.\nUse Scan Folders to catch changes made while Recall was closed."
+                    : "Choose Index → Scan Folders to index text files (up to 5 MiB), text-layer PDFs, DOCX documents and IPYNB notebooks (up to 20 MiB).")
+                : "Choose Index → Indexed Folders to add a folder.");
         UpdateSearchButtons();
     }
 
