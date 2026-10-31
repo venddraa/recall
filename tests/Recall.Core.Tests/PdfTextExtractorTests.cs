@@ -13,15 +13,20 @@ public sealed class PdfTextExtractorTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"recall-pdf-tests-{Guid.NewGuid():N}");
     private CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private ScannedFile WritePdf(string name, string? text)
+    private ScannedFile WritePdf(string name, string? text) => WritePdfPages(name, [text]);
+
+    private ScannedFile WritePdfPages(string name, params string?[] pageTexts)
     {
         Directory.CreateDirectory(_directory);
         var builder = new PdfDocumentBuilder();
-        var page = builder.AddPage(PageSize.A4);
-        if (text is not null)
+        foreach (var text in pageTexts)
         {
-            var font = builder.AddStandard14Font(Standard14Font.Helvetica);
-            page.AddText(text, 12, new PdfPoint(40, 750), font);
+            var page = builder.AddPage(PageSize.A4);
+            if (text is not null)
+            {
+                var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+                page.AddText(text, 12, new PdfPoint(40, 750), font);
+            }
         }
         var path = Path.Combine(_directory, name);
         File.WriteAllBytes(path, builder.Build());
@@ -32,6 +37,73 @@ public sealed class PdfTextExtractorTests : IDisposable
     {
         var info = new FileInfo(path);
         return new(path, info.Name, info.Extension, info.Length, info.LastWriteTimeUtc);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AcceptsSinglePageTextExactlyAtCharacterLimit(bool leadingBlankPage)
+    {
+        const string text = "clear sky index";
+        var file = leadingBlankPage
+            ? WritePdfPages("boundary.pdf", null, text)
+            : WritePdf("boundary.pdf", text);
+        var extractor = new FileTextExtractor(1024, 1024 * 1024, text.Length);
+
+        var result = extractor.Extract(file, Token);
+
+        Assert.Equal(TextExtractionStatus.Extracted, result.Status);
+        Assert.Equal(text, result.Text);
+    }
+
+    [Theory]
+    [InlineData(1, TextExtractionStatus.TooLarge)]
+    [InlineData(0, TextExtractionStatus.Extracted)]
+    [InlineData(-1, TextExtractionStatus.Extracted)]
+    public void CountsOnlySeparatorsThatAreWrittenBetweenPages(int charactersOverLimit, TextExtractionStatus expectedStatus)
+    {
+        const string expected = "clear sky\nindex";
+        var file = WritePdfPages("pages.pdf", "clear sky", "index");
+        var extractor = new FileTextExtractor(1024, 1024 * 1024, expected.Length - charactersOverLimit);
+
+        var result = extractor.Extract(file, Token);
+
+        Assert.Equal(expectedStatus, result.Status);
+        Assert.Equal(expectedStatus == TextExtractionStatus.Extracted ? expected : null, result.Text);
+    }
+
+    [Fact]
+    public async Task CharacterLimitKeepsFilenameAndOtherFilesSearchableAndRecoversOnRetry()
+    {
+        const string content = "uniqueoverflow";
+        var oversized = WritePdf("oversized-report.pdf", content);
+        var good = WritePdf("good.pdf", "retained");
+        var store = new FileMetadataStore(Path.Combine(_directory, "data", "recall.db"));
+        await store.InitializeAsync(Token);
+
+        var indexed = await store.IndexScanAsync([oversized, good],
+            new FileTextExtractor(1024, 1024 * 1024, content.Length - 1), cancellationToken: Token);
+
+        Assert.Equal(1, indexed.SkippedFiles[TextExtractionStatus.TooLarge]);
+        Assert.Equal(1, indexed.ExtractedFiles);
+        var result = Assert.Single(await store.SearchAsync("oversized report", cancellationToken: Token));
+        Assert.Equal(oversized.FullPath, result.FullPath);
+        Assert.Equal(TextExtractionStatus.TooLarge, result.ExtractionStatus);
+        Assert.Empty(result.Snippet);
+        Assert.Empty(await store.SearchAsync("uniqueoverflow", cancellationToken: Token));
+        Assert.Equal(good.FullPath, Assert.Single(await store.SearchAsync("retained", cancellationToken: Token)).FullPath);
+
+        // The same unchanged PDF can be retried at the exact boundary without
+        // forcing extraction or retaining a stale TooLarge result.
+        var retried = await store.IndexScanAsync([oversized],
+            new FileTextExtractor(1024, 1024 * 1024, content.Length), cancellationToken: Token);
+
+        Assert.Equal(1, retried.ExtractedFiles);
+        var recovered = Assert.Single(await store.SearchAsync("uniqueoverflow", cancellationToken: Token));
+        Assert.Equal(oversized.FullPath, recovered.FullPath);
+        Assert.Equal(TextExtractionStatus.Extracted, recovered.ExtractionStatus);
+        Assert.Equal(content, recovered.Snippet);
+        Assert.Equal(oversized, Record(oversized.FullPath));
     }
 
     [Fact]

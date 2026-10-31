@@ -33,7 +33,10 @@ internal sealed class PdfTextExtractor(int maximumFileBytes, int maximumTextChar
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var pageText = ContentOrderTextExtractor.GetText(page).ReplaceLineEndings("\n");
-                if (content.Length + pageText.Length + 1 > maximumTextCharacters)
+                // Count a separator only when it will actually be appended. In
+                // particular, the first nonempty page may fill the entire limit.
+                var separatorLength = content.Length > 0 ? 1 : 0;
+                if (pageText.Length > maximumTextCharacters - content.Length - separatorLength)
                     return new(TextExtractionStatus.TooLarge);
                 if (content.Length > 0)
                     content.Append('\n');
