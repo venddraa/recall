@@ -127,6 +127,11 @@ public partial class MainWindow : Window
         // watcher coordination, and rollback. Existing settings keep this off by default.
         if (IsVisible && _databaseReady && _settings.ScanOnStartup && _folders.Count > 0)
             await ScanFoldersAsync(_folders);
+        else if (IsVisible && _databaseReady && _searchCancellation is null
+            && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
+            // TextChanged cannot search before the database is ready. Use the
+            // current text, unless a newer search has already started.
+            await RunSearchAsync();
     }
 
     private async void IndexedFolders_OnClick(object? sender, RoutedEventArgs e)
@@ -337,6 +342,13 @@ public partial class MainWindow : Window
                     UpdateMonitoringStatus();
             }
         }
+
+        // Search only after the index transaction committed and scanning controls
+        // were restored. Leave cancellation/failure messages and empty-query scan
+        // summaries visible. Rerun against all currently selected folders on page 1.
+        if (scanSaved && !cancellation.IsCancellationRequested && IsVisible
+            && !string.IsNullOrWhiteSpace(this.FindControl<TextBox>("SearchBox")!.Text))
+            await RunSearchAsync();
     }
 
     private static string FormatSkippedContent(TextIndexResult result)
