@@ -223,12 +223,13 @@ public sealed class FileMetadataStore
         using var reuseCommand = connection.CreateCommand();
         reuseCommand.Transaction = transaction;
         reuseCommand.CommandText = """
-            SELECT EXISTS (
+            SELECT t.status, EXISTS (
                 SELECT 1 FROM file_search AS s
-                WHERE s.rowid = m.id AND s.filename = $filename)
+                WHERE s.rowid = m.id AND s.filename = $filename
+                    AND (t.status = 'Extracted' OR s.content = ''))
             FROM file_metadata AS m JOIN file_text AS t ON t.file_id = m.id
             WHERE m.full_path = $path AND m.size = $size AND m.modified_at_utc = $modified
-                AND t.status = 'Extracted';
+                AND t.status IN ('Extracted', 'Unsupported');
             """;
         var reusePath = reuseCommand.Parameters.Add("$path", SqliteType.Text);
         var reuseSize = reuseCommand.Parameters.Add("$size", SqliteType.Integer);
@@ -284,13 +285,20 @@ public sealed class FileMetadataStore
             reuseFilename.Value = file.Filename;
             var reuse = false;
             var searchUnchanged = false;
+            var unsupportedSearchUnchanged = false;
             if (!forceTextExtraction && extractor is not null)
             {
                 using var reader = reuseCommand.ExecuteReader();
-                reuse = reader.Read() && extractor.CanReuse(file);
-                // Reuse valid text without rewriting FTS, but repair missing or mismatched
-                // search rows. Dispose the reader before any writes on this connection.
-                searchUnchanged = reuse && reader.GetBoolean(0);
+                if (reader.Read())
+                {
+                    var previousStatus = reader.GetString(0);
+                    reuse = previousStatus == nameof(TextExtractionStatus.Extracted) && extractor.CanReuse(file);
+                    // Reuse valid text without rewriting FTS, but repair missing or mismatched
+                    // search rows. Dispose the reader before any writes on this connection.
+                    searchUnchanged = reuse && reader.GetBoolean(1);
+                    unsupportedSearchUnchanged = previousStatus == nameof(TextExtractionStatus.Unsupported)
+                        && reader.GetBoolean(1);
+                }
             }
             invalidateCommand.ExecuteNonQuery();
             command.ExecuteNonQuery();
@@ -299,6 +307,10 @@ public sealed class FileMetadataStore
                 var result = reuse
                     ? new TextExtractionResult(TextExtractionStatus.Extracted)
                     : extractor.Extract(file, cancellationToken);
+                // Recheck format support on every scan. A newly available parser must
+                // replace the filename-only index; never reuse stale unsupported content.
+                if (unsupportedSearchUnchanged && result.Status == TextExtractionStatus.Unsupported)
+                    searchUnchanged = true;
                 textPath.Value = pathParameter.Value;
                 status.Value = result.Status.ToString();
                 content.Value = (object?)result.Text ?? DBNull.Value;

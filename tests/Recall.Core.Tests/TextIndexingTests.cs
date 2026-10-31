@@ -3,6 +3,10 @@ using Microsoft.Data.Sqlite;
 using Recall.Core.Extraction;
 using Recall.Core.Scanning;
 using Recall.Core.Storage;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
+using UglyToad.PdfPig.Writer;
 
 namespace Recall.Core.Tests;
 
@@ -178,12 +182,15 @@ public sealed class TextIndexingTests : IDisposable
         Assert.Single(await store.SearchAsync("after different", cancellationToken: Token));
     }
 
-    [Fact]
-    public async Task UnchangedScanDoesNotWriteToTheSearchIndex()
+    [Theory]
+    [InlineData("notes.txt", true)]
+    [InlineData("archive.zip", false)]
+    [InlineData("image.png", false)]
+    public async Task UnchangedScanDoesNotWriteToTheSearchIndex(string filename, bool hasText)
     {
         var store = CreateStore();
         await store.InitializeAsync(Token);
-        var file = await WriteFile("notes.txt", Encoding.UTF8.GetBytes("remembered content"));
+        var file = await WriteFile(filename, Encoding.UTF8.GetBytes("remembered content"));
         var extractor = new PlainTextExtractor(1024);
         await store.IndexScanAsync([file], extractor, cancellationToken: Token);
         using (var connection = Connect(store))
@@ -212,10 +219,73 @@ public sealed class TextIndexingTests : IDisposable
         var result = await store.SynchronizeScanAsync(scan, [root], extractor, cancellationToken: Token);
 
         Assert.Equal(1, result.StoredFiles);
-        Assert.Equal(1, result.StoredTextFiles);
+        Assert.Equal(hasText ? 1 : 0, result.StoredTextFiles);
         Assert.Equal(0, result.RemovedFiles);
-        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync("remembered content", cancellationToken: Token)).FullPath);
+        Assert.Equal(file.FullPath, Assert.Single(await store.SearchAsync(Path.GetFileNameWithoutExtension(filename),
+            cancellationToken: Token)).FullPath);
+        Assert.Equal(hasText ? 1 : 0, (await store.SearchAsync("remembered content", cancellationToken: Token)).Count);
+        Assert.Equal(hasText ? 0 : 1, result.SkippedFiles.GetValueOrDefault(TextExtractionStatus.Unsupported));
         Assert.Equal("remembered content", await File.ReadAllTextAsync(file.FullPath, Token));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("filename")]
+    [InlineData("content")]
+    public async Task UnsupportedFilesRepairMissingOrMismatchedSearchEntries(string damage)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("archive.zip", Encoding.UTF8.GetBytes("not supported"));
+        var extractor = new PlainTextExtractor(1024);
+        await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+        using (var connection = Connect(store))
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = damage switch
+            {
+                "missing" => "DELETE FROM file_search;",
+                "filename" => "UPDATE file_search SET filename = 'obsoletefilename.zip';",
+                _ => "UPDATE file_search SET content = 'stalecontent';"
+            };
+            command.ExecuteNonQuery();
+        }
+
+        var result = await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+
+        Assert.Equal(1, result.SkippedFiles[TextExtractionStatus.Unsupported]);
+        var match = Assert.Single(await store.SearchAsync("archive", cancellationToken: Token));
+        Assert.Equal(file.FullPath, match.FullPath);
+        Assert.Equal(TextExtractionStatus.Unsupported, match.ExtractionStatus);
+        Assert.Empty(match.Snippet);
+        Assert.Empty(await store.SearchAsync("obsoletefilename", cancellationToken: Token));
+        Assert.Empty(await store.SearchAsync("stalecontent", cancellationToken: Token));
+    }
+
+    [Fact]
+    public async Task PreviouslyUnsupportedFileIsExtractedWhenAParserBecomesAvailable()
+    {
+        var builder = new PdfDocumentBuilder();
+        var page = builder.AddPage(PageSize.A4);
+        var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+        page.AddText("newly searchable contents", 12, new PdfPoint(40, 750), font);
+        var file = await WriteFile("report.pdf", builder.Build());
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+        Assert.Equal(TextExtractionStatus.Unsupported,
+            Assert.Single(await store.SearchAsync("report", cancellationToken: Token)).ExtractionStatus);
+        Assert.Empty(await store.SearchAsync("newly searchable", cancellationToken: Token));
+
+        var result = await store.IndexScanAsync([file], new FileTextExtractor(1024, 1024 * 1024, 4096),
+            cancellationToken: Token);
+
+        Assert.Equal(1, result.ExtractedFiles);
+        Assert.Equal(0, result.SkippedFiles.GetValueOrDefault(TextExtractionStatus.Unsupported));
+        var match = Assert.Single(await store.SearchAsync("newly searchable", cancellationToken: Token));
+        Assert.Equal(file.FullPath, match.FullPath);
+        Assert.Equal(TextExtractionStatus.Extracted, match.ExtractionStatus);
+        Assert.Equal("newly searchable contents", match.Snippet);
     }
 
     [Theory]
