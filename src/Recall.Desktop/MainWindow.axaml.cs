@@ -237,12 +237,12 @@ public partial class MainWindow : Window
         var operation = forceTextExtraction ? "Reindex" : "Scan";
         _scanCancellation = cancellation;
         ResetSearchView(forceTextExtraction ? "Reindexing selected folder..." : "Scanning selected folders...",
-            "You can choose Index → Cancel Scan.");
+            "Click Cancel Scan below to stop.");
         SetScanningControls(true);
         this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
             forceTextExtraction
-                ? $"{roots[0]}\nAll supported file contents will be reread. Choose Index → Cancel Scan to stop."
-                : "You can choose Index → Cancel Scan.";
+                ? $"{roots[0]}\nAll supported file contents will be reread. Click Cancel Scan below to stop."
+                : "Click Cancel Scan below to stop.";
         this.FindControl<TextBlock>("IndexStatusText")!.Text = $"{operation}: Starting";
 
         var savingMetadata = false;
@@ -269,7 +269,7 @@ public partial class MainWindow : Window
             {
                 this.FindControl<TextBlock>("EmptyStateTitle")!.Text = "Extracting and saving file text...";
                 this.FindControl<TextBlock>("EmptyStateDescription")!.Text =
-                    $"Choose Index → Cancel Scan to stop without saving this {operation.ToLowerInvariant()}.";
+                    $"Click Cancel Scan below to stop without saving this {operation.ToLowerInvariant()}.";
                 this.FindControl<TextBlock>("IndexStatusText")!.Text = $"Text: 0 / {result.Files.Count:N0} files";
             }
 
@@ -377,8 +377,13 @@ public partial class MainWindow : Window
 
     private void CancelScan_OnClick(object? sender, RoutedEventArgs e)
     {
-        _scanCancellation?.Cancel();
+        if (_scanCancellation is not { IsCancellationRequested: false } cancellation)
+            return;
+        cancellation.Cancel();
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = false;
+        var button = this.FindControl<Button>("CancelScanButton")!;
+        button.IsEnabled = false;
+        button.Content = "Cancelling...";
         this.FindControl<TextBlock>("IndexStatusText")!.Text = "Scan: Cancelling";
     }
 
@@ -388,6 +393,10 @@ public partial class MainWindow : Window
         this.FindControl<MenuItem>("SettingsMenuItem")!.IsEnabled = !scanning && _settingsStore is not null;
         this.FindControl<MenuItem>("ScanFoldersMenuItem")!.IsEnabled = !scanning && _folders.Count > 0 && _databaseReady;
         this.FindControl<MenuItem>("CancelScanMenuItem")!.IsEnabled = scanning;
+        var cancelButton = this.FindControl<Button>("CancelScanButton")!;
+        cancelButton.IsVisible = scanning;
+        cancelButton.IsEnabled = scanning;
+        cancelButton.Content = "Cancel Scan";
         this.FindControl<MenuItem>("LastCompletedScanMenuItem")!.IsEnabled = !scanning && _lastCompletedScan is not null;
         this.FindControl<TextBox>("SearchBox")!.IsEnabled = !scanning;
         UpdateSearchButtons();

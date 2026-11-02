@@ -15,6 +15,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="If words are already in the search box, Recall searches them automatically after a successful scan or reindex, starting on page 1. Words entered while the application is loading are searched once it is ready. With an empty search box, the scan summary stays visible; cancelled or failed scans keep their status message."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="During a scan or reindex, use Cancel Scan in the bottom status bar, or Index → Cancel Scan, to stop. After a cancellation request the button shows Cancelling... and is disabled until the operation finishes."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="Opening Indexed Folders and closing it without changing the folder list keeps your results page and selection. Changing the list clears the old results and reruns an existing query on page 1 if folders remain selected. Automatic updates pause while this dialog is open; use Scan Folders to catch changes made during that time or to index a newly added folder."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Search rules" FontWeight="Bold" Margin="0,6,0,0" />

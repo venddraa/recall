@@ -75,6 +75,12 @@ di-index versi lama, pilih foldernya di Indexed Folders lalu **Reindex Folder**.
    tidak lagi muncul. Penghapusan dokumen uji juga harus menghapus hasilnya setelah scan.
 6. Tekan **F5** atau pilih **File → Refresh Results** untuk membaca ulang hasil
    dari index. Refresh ini tidak membaca perubahan isi file dari disk.
+7. Saat scan/reindex berlangsung cukup lama untuk terlihat, tombol **Cancel Scan**
+   harus muncul di status bar bawah. Klik tombol itu: label menjadi **Cancelling...**
+   dan tombol dinonaktifkan selama pembatalan diproses. Setelah selesai, tombol
+   hilang dan status pembatalan terlihat. Coba juga pembatalan melalui
+   **Index → Cancel Scan**; tombol bawah harus mengikuti keadaan yang sama.
+   Jika scan selesai sangat cepat, tombol bisa hanya terlihat sebentar.
 
 ## 4. Periksa penyimpanan dan laporan
 

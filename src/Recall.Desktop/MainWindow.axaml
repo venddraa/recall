@@ -172,17 +172,27 @@
 
         <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
                 Padding="10,6">
-            <Grid ColumnDefinitions="2*,Auto,Auto,3*">
+            <Grid ColumnDefinitions="2*,Auto,Auto,3*,Auto" MinHeight="24">
                 <TextBlock x:Name="ResultCountText" Text="0 results"
+                           VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding #ResultCountText.Text}" />
                 <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0"
+                           VerticalAlignment="Center"
                            ToolTip.Tip="{Binding #FolderCountText.Text}" />
                 <TextBlock x:Name="StoredFileCountText" Grid.Column="2" Text="Stored files: 0" Margin="16,0"
+                           VerticalAlignment="Center"
                            ToolTip.Tip="{Binding #StoredFileCountText.Text}" />
                 <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings"
+                           VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding #IndexStatusText.Text}" />
+                <Button x:Name="CancelScanButton" Grid.Column="4" Content="Cancel Scan"
+                        IsVisible="False" IsEnabled="False" MinWidth="100" MinHeight="24"
+                        Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                        Click="CancelScan_OnClick"
+                        ToolTip.Tip="Cancel the current scan or reindex"
+                        AutomationProperties.Name="Cancel the current scan or reindex" />
             </Grid>
         </Border>
     </Grid>
