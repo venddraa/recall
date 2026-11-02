@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security;
 using Microsoft.Win32.SafeHandles;
+using Recall.Core.Folders;
 using Recall.Core.Scanning;
 
 namespace Recall.Core.Extraction;
@@ -24,17 +25,7 @@ internal static class ReadOnlyFileAccess
         }
     }
 
-    internal static bool HasSymbolicLink(string path)
-    {
-        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            return true;
-        for (var directory = new FileInfo(path).Directory; directory is not null; directory = directory.Parent)
-        {
-            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-                return true;
-        }
-        return false;
-    }
+    internal static bool HasSymbolicLink(string path) => FolderPath.HasSymbolicLink(path);
 
     internal static FileStream Open(string path)
     {

@@ -13,6 +13,8 @@
                     <TextBlock Text="Find a file by what you remember" FontWeight="Bold" />
                     <TextBlock Text="Choose Index → Indexed Folders, add and select a folder, then click Scan Folder. To scan all selected folders, use Index → Scan Folders. Type words from a filename or its contents; results appear when you pause typing."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="Recall skips symbolic links. When adding a folder, choose its original location without linked parent folders. If your folder picker resolves a shortcut to the original path, that original folder can be added normally. Older saved linked paths remain in the list until you remove them."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="If words are already in the search box, Recall searches them automatically after a successful scan or reindex, starting on page 1. Words entered while the application is loading are searched once it is ready. With an empty search box, the scan summary stays visible; cancelled or failed scans keep their status message."
                                TextWrapping="Wrap" />
                     <TextBlock Text="During a scan or reindex, use Cancel Scan in the bottom status bar, or Index → Cancel Scan, to stop. After a cancellation request the button shows Cancelling... and is disabled until the operation finishes."

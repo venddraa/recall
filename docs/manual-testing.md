@@ -64,6 +64,13 @@ launcher, tutup Recall lalu jalankan `bash scripts/install-launcher.sh` terlebih
    Coba lagi dengan pilihan teks dari arah kanan ke kiri. Pilihan teks harus
    dibersihkan jika snippet berubah atau file yang dipilih tidak lagi muncul.
 
+Recall melewati symbolic link saat indexing. Untuk folder yang biasa dibuka
+melalui link, pilih lokasi aslinya di Add Folder. Jika picker mengembalikan path
+link, Recall harus menampilkan penjelasan dan tidak menambahkan path itu. Jika
+picker otomatis memakai lokasi asli, folder dapat ditambahkan seperti biasa.
+Path link yang sudah tersimpan dari versi sebelumnya dapat dihapus dari daftar
+lalu diganti dengan lokasi aslinya; dokumen tidak perlu dipindahkan.
+
 Untuk menguji PDF dan DOCX, tambahkan dokumen uji `opaque-b.pdf` dan
 `opaque-c.docx` yang berisi kalimat sama ke folder tersebut, lalu pilih
 **Index → Scan Folders**. Gunakan PDF dengan text layer, bukan hasil scan gambar.

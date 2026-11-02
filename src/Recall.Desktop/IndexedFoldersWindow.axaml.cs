@@ -101,9 +101,17 @@ public partial class IndexedFoldersWindow : Window
                 return;
             }
 
-            if (!await Task.Run(() => Directory.Exists(path)))
+            var validationError = await Task.Run(() =>
             {
-                ShowMessage("The folder is unavailable or cannot be accessed.", isError: true);
+                if (!Directory.Exists(path))
+                    return "The folder is unavailable or cannot be accessed.";
+                return FolderPath.HasSymbolicLink(path)
+                    ? "Recall skips symbolic links. Choose the folder at its original location, without linked parent folders."
+                    : null;
+            });
+            if (validationError is not null)
+            {
+                ShowMessage(validationError, isError: true);
                 return;
             }
 
