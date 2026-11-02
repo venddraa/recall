@@ -131,7 +131,11 @@ internal sealed class NotebookTextExtractor(int maximumFileBytes, int maximumTex
                             throw new InvalidDataException("The notebook error name or message is missing or invalid.");
                         // Store the plain error summary. Traceback frames can duplicate the
                         // message and contain terminal formatting; they are not indexed.
-                        AppendBlock(errorName);
+                        // The summary includes ": " even when the name is empty,
+                        // so it always starts a new nonempty block.
+                        if (content.Length > 0)
+                            Append("\n");
+                        Append(errorName.GetString()!);
                         Append(": ");
                         Append(errorValue.GetString()!);
                         break;
@@ -142,10 +146,9 @@ internal sealed class NotebookTextExtractor(int maximumFileBytes, int maximumTex
 
         void AppendBlock(JsonElement value)
         {
-            if (content.Length > 0)
-                Append("\n");
+            var blockStarted = false;
             if (value.ValueKind == JsonValueKind.String)
-                Append(value.GetString()!);
+                AppendFragment(value.GetString()!);
             else if (value.ValueKind == JsonValueKind.Array)
             {
                 // nbformat stores multiline strings as either one string or fragments joined without separators.
@@ -154,11 +157,26 @@ internal sealed class NotebookTextExtractor(int maximumFileBytes, int maximumTex
                     cancellationToken.ThrowIfCancellationRequested();
                     if (part.ValueKind != JsonValueKind.String)
                         throw new InvalidDataException("Notebook text fragments must be strings.");
-                    Append(part.GetString()!);
+                    AppendFragment(part.GetString()!);
                 }
             }
             else
                 throw new InvalidDataException("Notebook text must be a string or an array of strings.");
+
+            void AppendFragment(string text)
+            {
+                // Empty cells/outputs have no text to separate. Preserve actual
+                // whitespace and join fragments without introducing extra gaps.
+                if (text.Length == 0)
+                    return;
+                if (!blockStarted)
+                {
+                    if (content.Length > 0)
+                        Append("\n");
+                    blockStarted = true;
+                }
+                Append(text);
+            }
         }
 
         void Append(string value)

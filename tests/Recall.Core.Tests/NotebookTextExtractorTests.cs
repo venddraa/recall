@@ -43,6 +43,87 @@ public sealed class NotebookTextExtractorTests : IDisposable
 
     private FileMetadataStore CreateStore() => new(Path.Combine(_directory, "data", "recall.db"));
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task EmptyCellsAndOutputsDoNotConsumeTextBudgetOrHideContentSearch(int emptyShape)
+    {
+        object empty = emptyShape switch
+        {
+            0 => "",
+            1 => Array.Empty<string>(),
+            _ => new[] { "", "" }
+        };
+        var file = WriteNotebook([
+            Cell("raw", empty),
+            Cell("markdown", "clear sky"),
+            Cell("code", empty, [
+                new { output_type = "stream", name = "stdout", text = empty },
+                new { output_type = "display_data", data = new Dictionary<string, object> { ["text/plain"] = empty } },
+                new { output_type = "execute_result", data = new Dictionary<string, object> { ["text/plain"] = empty } }
+            ]),
+            Cell("raw", empty),
+            Cell("markdown", "index"),
+            Cell("raw", empty)
+        ]);
+        const string expected = "clear sky\nindex";
+        var before = await File.ReadAllBytesAsync(file.FullPath, Token);
+        var extractor = new FileTextExtractor(1024, 1024 * 1024, expected.Length);
+
+        var extracted = extractor.Extract(file, Token);
+        Assert.Equal(TextExtractionStatus.Extracted, extracted.Status);
+        Assert.Equal(expected, extracted.Text);
+        var tooSmall = new FileTextExtractor(1024, 1024 * 1024, expected.Length - 1).Extract(file, Token);
+        Assert.Equal(TextExtractionStatus.TooLarge, tooSmall.Status);
+        Assert.Null(tooSmall.Text);
+
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var indexed = await store.IndexScanAsync([file], extractor, cancellationToken: Token);
+
+        Assert.Equal(1, indexed.ExtractedFiles);
+        var match = Assert.Single(await store.SearchAsync("clear sky index", cancellationToken: Token));
+        Assert.Equal(file.FullPath, match.FullPath);
+        Assert.Equal(expected, match.Snippet);
+        Assert.Equal(TextExtractionStatus.Extracted, match.ExtractionStatus);
+        Assert.Equal(before, await File.ReadAllBytesAsync(file.FullPath, Token));
+        Assert.Equal(file.ModifiedAtUtc, File.GetLastWriteTimeUtc(file.FullPath));
+    }
+
+    [Fact]
+    public void EmptyFragmentsDoNotAddSeparatorsInsideOrBetweenBlocks()
+    {
+        var file = WriteNotebook([
+            Cell("markdown", "first"),
+            Cell("code", Array.Empty<string>()),
+            Cell("raw", new[] { "", "clear", "", " sky", "", " index", "" }),
+            Cell("raw", "")
+        ]);
+
+        Assert.Equal("first\nclear sky index", _extractor.Extract(file, Token).Text);
+    }
+
+    [Fact]
+    public void WhitespaceOnlyBlocksArePreserved()
+    {
+        var file = WriteNotebook([Cell("markdown", "alpha"), Cell("code", " \t"), Cell("raw", "beta")]);
+
+        Assert.Equal("alpha\n \t\nbeta", _extractor.Extract(file, Token).Text);
+    }
+
+    [Theory]
+    [InlineData("message", "calc()\n: message")]
+    [InlineData("", "calc()\n: ")]
+    public void ErrorSummaryKeepsItsOwnBlockEvenWhenErrorNameIsEmpty(string message, string expected)
+    {
+        var file = WriteNotebook([Cell("code", "calc()", [
+            new { output_type = "error", ename = "", evalue = message, traceback = Array.Empty<string>() }
+        ])]);
+
+        Assert.Equal(expected, _extractor.Extract(file, Token).Text);
+    }
+
     [Fact]
     public void ReadsMarkdownCodeAndRawWithStringFragmentsAndUnicode()
     {
@@ -231,6 +312,8 @@ public sealed class NotebookTextExtractorTests : IDisposable
     [InlineData("{\"nbformat\":4,\"cells\":[null]}")]
     [InlineData("{\"nbformat\":4,\"cells\":[{\"source\":\"missing type\"}]}")]
     [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"code\",\"source\":[\"valid first\",42]}]}")]
+    [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"markdown\",\"source\":[\"\",null]}]}")]
+    [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"code\",\"source\":\"\",\"outputs\":[{\"output_type\":\"stream\",\"text\":[\"\",false]}]}]}")]
     [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"code\",\"source\":null}]}")]
     [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"markdown\",\"source\":\"\\ud800\"}]}")]
     [InlineData("{\"nbformat\":4,\"cells\":[{\"cell_type\":\"code\",\"source\":\"valid first\",\"outputs\":{}}]}")]
