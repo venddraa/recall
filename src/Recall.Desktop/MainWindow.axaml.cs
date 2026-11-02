@@ -564,7 +564,13 @@ public partial class MainWindow : Window
             var list = this.FindControl<ListBox>("ResultsList")!;
             // Read the current selection after the query: the user may have navigated
             // to a different file while this background refresh was running.
-            var selectedPath = keepResults ? (list.SelectedItem as SearchResultRow)?.FullPath : null;
+            var selectedRow = keepResults ? list.SelectedItem as SearchResultRow : null;
+            var selectedPath = selectedRow?.FullPath;
+            var preview = this.FindControl<SelectableTextBlock>("ContentPreview")!;
+            var previewScroll = this.FindControl<ScrollViewer>("ContentPreviewScroll")!;
+            var previewSelectionStart = preview.SelectionStart;
+            var previewSelectionEnd = preview.SelectionEnd;
+            var previewOffset = previewScroll.Offset;
             var restoreFocus = keepResults && IsActive && list.IsKeyboardFocusWithin;
             list.ItemsSource = rows;
             _displayedQuery = query;
@@ -596,6 +602,17 @@ public partial class MainWindow : Window
                         FocusSearchResults();
                     else
                         list.Focus();
+                }
+                // Replacing the list resets the preview through SelectionChanged.
+                // Preserve the user's latest text selection/scroll only when the
+                // displayed file and snippet still have exactly the same text.
+                if (selectedRow is not null && list.SelectedItem is SearchResultRow current
+                    && string.Equals(current.FullPath, selectedRow.FullPath, StringComparison.Ordinal)
+                    && string.Equals(current.Snippet, selectedRow.Snippet, StringComparison.Ordinal))
+                {
+                    preview.SelectionStart = previewSelectionStart;
+                    preview.SelectionEnd = previewSelectionEnd;
+                    previewScroll.Offset = previewOffset;
                 }
             }
             else if (rows.Length > 0)

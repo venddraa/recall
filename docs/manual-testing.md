@@ -58,6 +58,11 @@ launcher, tutup Recall lalu jalankan `bash scripts/install-launcher.sh` terlebih
 8. Cari `opaque`: kata itu harus di-highlight di kolom Name. Cari kembali
    `jejak surya7421`: highlight harus muncul di preview isi; nama `opaque-a.txt`
    dan `opaque-d.ipynb` tetap ditampilkan tanpa highlight yang tidak terkait.
+9. Pilih beberapa kata di **Content preview** dengan mouse, lalu tekan **F5**
+   tanpa mengubah file. Pilihan teks harus tetap ada dan bisa disalin dengan
+   **Ctrl+C**. Jika preview dapat di-scroll, posisi scroll juga harus tetap.
+   Coba lagi dengan pilihan teks dari arah kanan ke kiri. Pilihan teks harus
+   dibersihkan jika snippet berubah atau file yang dipilih tidak lagi muncul.
 
 Untuk menguji PDF dan DOCX, tambahkan dokumen uji `opaque-b.pdf` dan
 `opaque-c.docx` yang berisi kalimat sama ke folder tersebut, lalu pilih

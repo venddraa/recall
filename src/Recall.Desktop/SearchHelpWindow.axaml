@@ -30,6 +30,8 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="File → Refresh Results (F5) reruns the current results page against the saved index. It keeps the selected file if that file still appears on this page, and clears the selection if it disappears. To read changes from files on disk, use Scan Folder or Scan Folders. Find or Enter starts again on page 1."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="Refresh Results and automatic result updates preserve selected preview text and its scroll position when the selected file and snippet text are unchanged. If the snippet changes or the file leaves the page, the preview text selection is cleared."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="If a file is missing" FontWeight="Bold" Margin="0,6,0,0" />
                     <TextBlock Text="Check that its folder is selected, then choose Scan Folder in Indexed Folders, or Scan Folders for all selected folders. Changes made while Recall was closed need a scan; Tools → Settings can enable scanning on startup."
                                TextWrapping="Wrap" />
