@@ -55,6 +55,9 @@ launcher, tutup Recall lalu jalankan `bash scripts/install-launcher.sh` terlebih
 7. Pilih salah satu hasil, buka **Index → Indexed Folders...**, lalu klik Close
    tanpa mengubah daftar folder. Query, halaman, hasil, dan pilihan file harus
    tetap sama. Jika hasil pencarianmu memiliki beberapa halaman, ulangi dari halaman kedua.
+8. Cari `opaque`: kata itu harus di-highlight di kolom Name. Cari kembali
+   `jejak surya7421`: highlight harus muncul di preview isi; nama `opaque-a.txt`
+   dan `opaque-d.ipynb` tetap ditampilkan tanpa highlight yang tidak terkait.
 
 Untuk menguji PDF dan DOCX, tambahkan dokumen uji `opaque-b.pdf` dan
 `opaque-c.docx` yang berisi kalimat sama ke folder tersebut, lalu pilih

@@ -121,3 +121,33 @@ snippet. Seluruh validasi benchmark aplikasi juga lulus. Test regresi mencakup
 205 file dengan skor sama, perbedaan kapitalisasi nama, beberapa halaman,
 pembatasan folder, serta status ekstraksi yang kosong maupun gagal. Test tidak
 memakai ambang waktu.
+
+## Pemeriksaan highlight nama file
+
+Pada 2 November 2026, fitur highlight nama file diperiksa memakai 5.000 TXT
+sintetis (5,61 MiB), 10 iterasi per query setelah satu pemanasan, Fedora 44 x64,
+runtime .NET 10.0.13, dan build Release. Baseline memakai commit `78a6a5d`;
+versi sesudah menambahkan `highlight()` FTS5 pada kolom nama file dan span hasilnya.
+Kedua proses dijalankan berurutan dengan corpus baru yang isinya sama:
+
+```bash
+dotnet run --file scripts/benchmark.cs --configuration Release --no-cache -- --files 5000 --iterations 10
+```
+
+| Query | p50 sebelum | p50 sesudah | p95 sebelum | p95 sesudah |
+| --- | ---: | ---: | ---: | ---: |
+| Isi langka | 0,81 ms | 0,82 ms | 1,35 ms | 1,32 ms |
+| Isi `clear sky index` | 4,42 ms | 4,35 ms | 5,18 ms | 4,57 ms |
+| Prefix nama `BAP` | 4,84 ms | 5,13 ms | 5,16 ms | 5,29 ms |
+| Isi umum, halaman 1 | 12,98 ms | 12,38 ms | 14,06 ms | 13,05 ms |
+| Isi umum, halaman 2 | 14,35 ms | 14,06 ms | 14,86 ms | 16,06 ms |
+| Isi pada satu subfolder | 5,14 ms | 5,70 ms | 5,50 ms | 6,29 ms |
+| Tanpa hasil | 0,63 ms | 0,62 ms | 0,79 ms | 0,74 ms |
+
+Seluruh validasi lulus, termasuk hasil, pagination, snippet isi, dan pencarian
+ketika folder sumber tidak tersedia. Ukuran database tetap 15,43 MiB. Selisih
+p50 pada pasangan percobaan ini di bawah 1 ms; pengukuran tunggal tidak cukup
+untuk menyimpulkan percepatan atau menjamin performa koleksi yang lebih besar.
+Angka ini tidak mengukur render highlight di Avalonia. Test terpisah memeriksa
+span nama dengan prefix, aksen, markup literal, serta nama yang tidak cocok
+ketika hasil ditemukan hanya melalui isi.

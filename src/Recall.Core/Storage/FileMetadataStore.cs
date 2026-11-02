@@ -516,7 +516,8 @@ public sealed class FileMetadataStore
                 SELECT m.id, m.full_path, m.filename, m.extension, m.size, m.modified_at_utc,
                     bm25(file_search, 10.0, 1.0) AS rank,
                     snippet(file_search, 1, $matchStart, $matchEnd, ' … ', 32),
-                    (SELECT t.status FROM file_text AS t WHERE t.file_id = m.id)
+                    (SELECT t.status FROM file_text AS t WHERE t.file_id = m.id),
+                    highlight(file_search, 0, $matchStart, $matchEnd)
                 FROM file_search
                 JOIN file_metadata AS m ON m.id = file_search.rowid
                 WHERE file_search MATCH $query
@@ -556,11 +557,12 @@ public sealed class FileMetadataStore
                     // Missing or unrecognized status must not hide an otherwise valid filename match.
                     TextExtractionStatus? extractionStatus = Enum.TryParse<TextExtractionStatus>(savedStatus, out var parsedStatus)
                         && Enum.GetName(parsedStatus) == savedStatus ? parsedStatus : null;
-                    var parts = ReadSnippetParts(reader.GetString(7), matchStart, matchEnd);
+                    var parts = ReadHighlightedParts(reader.GetString(7), matchStart, matchEnd);
+                    var filenameParts = ReadHighlightedParts(reader.GetString(9), matchStart, matchEnd);
                     results.Add(new SearchResult(
                         reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
                         reader.GetInt64(4), ParseUtc(reader.GetString(5)), reader.GetDouble(6),
-                        string.Concat(parts.Select(part => part.Text)), extractionStatus, parts));
+                        string.Concat(parts.Select(part => part.Text)), extractionStatus, parts, filenameParts));
                 }
                 cancellationToken.ThrowIfCancellationRequested();
             }
@@ -574,7 +576,7 @@ public sealed class FileMetadataStore
         }, cancellationToken);
     }
 
-    private static IReadOnlyList<SearchSnippetPart> ReadSnippetParts(string snippet, string matchStart, string matchEnd)
+    private static IReadOnlyList<SearchSnippetPart> ReadHighlightedParts(string snippet, string matchStart, string matchEnd)
     {
         var parts = new List<SearchSnippetPart>();
         var position = 0;

@@ -7,6 +7,8 @@ namespace Recall.Desktop;
 public sealed class SearchResultRow(SearchResult result)
 {
     public string Filename => result.Filename;
+    public IReadOnlyList<SearchSnippetPart> FilenameParts => result.FilenameParts is { Count: > 0 } parts
+        ? parts : [new(Filename, false)];
     public string FullPath => result.FullPath;
     public string Folder => Path.GetDirectoryName(result.FullPath) ?? result.FullPath;
     public string Type => string.IsNullOrEmpty(result.Extension) ? "FILE" : result.Extension.TrimStart('.').ToUpperInvariant();

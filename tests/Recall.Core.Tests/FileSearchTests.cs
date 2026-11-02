@@ -204,6 +204,48 @@ public sealed class FileSearchTests : IDisposable
         Assert.False(Assert.Single(result.SnippetParts!).IsMatch);
     }
 
+    [Theory]
+    [InlineData("CLEAR-sky-index.bin", "clear sky index", "CLEAR|sky|index")]
+    [InlineData("BAPP-report.bin", "BAP", "BAPP")]
+    [InlineData("Café-déjà.bin", "CAFE DEJA", "Café|déjà")]
+    [InlineData("Cafe\u0301-notes.bin", "cafe", "Cafe\u0301")]
+    [InlineData("BA.bin", "BA\u0301", "BA")]
+    [InlineData("literal-<Run>-BAPP.bin", "run bap", "Run|BAPP")]
+    public async Task FilenameHighlightsFollowFtsMatchesAndPreserveTheWholeName(
+        string filename, string query, string expectedMatches)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile(filename, "unsupported content");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync(query, cancellationToken: Token));
+
+        var parts = Assert.IsAssignableFrom<IReadOnlyList<SearchSnippetPart>>(result.FilenameParts);
+        Assert.Equal(filename, result.Filename);
+        Assert.Equal(filename, string.Concat(parts.Select(part => part.Text)));
+        Assert.Equal(expectedMatches, string.Join("|", parts.Where(part => part.IsMatch).Select(part => part.Text)));
+        Assert.DoesNotContain(parts, part => string.IsNullOrEmpty(part.Text));
+        Assert.Empty(result.Snippet);
+        Assert.Equal(TextExtractionStatus.Unsupported, result.ExtractionStatus);
+    }
+
+    [Fact]
+    public async Task ContentOnlyMatchDoesNotHighlightUnrelatedFilename()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync(Token);
+        var file = await WriteFile("notes.txt", "clear sky index");
+        await store.IndexScanAsync([file], new PlainTextExtractor(1024), cancellationToken: Token);
+
+        var result = Assert.Single(await store.SearchAsync("clear sky", cancellationToken: Token));
+
+        var name = Assert.Single(result.FilenameParts!);
+        Assert.Equal(file.Filename, name.Text);
+        Assert.False(name.IsMatch);
+        Assert.Equal("clear|sky", string.Join("|", result.SnippetParts!.Where(part => part.IsMatch).Select(part => part.Text)));
+    }
+
     [Fact]
     public async Task QueryOperatorsAndQuotesAreTreatedAsLiteralWords()
     {

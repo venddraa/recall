@@ -637,6 +637,19 @@ public partial class MainWindow : Window
         UpdateContentPreview((sender as ListBox)?.SelectedItem as SearchResultRow);
     }
 
+    private void ResultFilename_OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (sender is not TextBlock text)
+            return;
+        // Virtualized rows can be reused for another file. Clear the old spans
+        // before rendering the new name as literal text.
+        text.Inlines!.Clear();
+        text.Text = null;
+        if (text.DataContext is SearchResultRow row)
+            foreach (var part in row.FilenameParts)
+                text.Inlines.Add(CreateHighlightedRun(part));
+    }
+
     private void UpdateContentPreview(SearchResultRow? row)
     {
         var preview = this.FindControl<SelectableTextBlock>("ContentPreview");
@@ -653,17 +666,20 @@ public partial class MainWindow : Window
         }
         preview.Inlines.Add(new Run(row.FullPath + "\n\n"));
         foreach (var part in row.SnippetParts)
+            preview.Inlines.Add(CreateHighlightedRun(part));
+    }
+
+    private static Run CreateHighlightedRun(SearchSnippetPart part)
+    {
+        // Filenames and document content are text, never XAML or HTML markup.
+        var run = new Run(part.Text);
+        if (part.IsMatch)
         {
-            // Add document content as text, never as XAML or HTML markup.
-            var run = new Run(part.Text);
-            if (part.IsMatch)
-            {
-                run.Background = new SolidColorBrush(Color.Parse("#FFF2A8"));
-                run.Foreground = Brushes.Black;
-                run.FontWeight = FontWeight.Bold;
-            }
-            preview.Inlines.Add(run);
+            run.Background = new SolidColorBrush(Color.Parse("#FFF2A8"));
+            run.Foreground = Brushes.Black;
+            run.FontWeight = FontWeight.Bold;
         }
+        return run;
     }
 
     private void CancelSearch()

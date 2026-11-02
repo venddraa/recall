@@ -106,7 +106,8 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="local:SearchResultRow">
                                 <Grid ColumnDefinitions="2*,3*,60,136,84">
-                                    <TextBlock Text="{Binding Filename}" TextTrimming="CharacterEllipsis"
+                                    <TextBlock DataContextChanged="ResultFilename_OnDataContextChanged"
+                                               TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Filename}"
                                                ToolTip.Tip="{Binding FullPath}" />
                                     <TextBlock Grid.Column="1" Text="{Binding Folder}" Margin="8,0,0,0"
                                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}" />

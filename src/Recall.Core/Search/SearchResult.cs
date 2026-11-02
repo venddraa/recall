@@ -12,4 +12,5 @@ public sealed record SearchResult(
     double Rank,
     string Snippet = "",
     TextExtractionStatus? ExtractionStatus = null,
-    IReadOnlyList<SearchSnippetPart>? SnippetParts = null);
+    IReadOnlyList<SearchSnippetPart>? SnippetParts = null,
+    IReadOnlyList<SearchSnippetPart>? FilenameParts = null);
