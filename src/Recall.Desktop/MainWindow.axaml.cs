@@ -681,7 +681,11 @@ public partial class MainWindow : Window
             preview.Text = "Select a search result to see its matching text.";
             return;
         }
-        preview.Inlines.Add(new Run(row.FullPath + "\n\n"));
+        preview.Inlines.Add(new Run(row.FullPath + "\n\n")
+        {
+            Foreground = new SolidColorBrush(Color.Parse("#61707D")),
+            FontSize = 12
+        });
         foreach (var part in row.SnippetParts)
             preview.Inlines.Add(CreateHighlightedRun(part));
     }
@@ -692,9 +696,9 @@ public partial class MainWindow : Window
         var run = new Run(part.Text);
         if (part.IsMatch)
         {
-            run.Background = new SolidColorBrush(Color.Parse("#FFF2A8"));
-            run.Foreground = Brushes.Black;
-            run.FontWeight = FontWeight.Bold;
+            run.Background = new SolidColorBrush(Color.Parse("#F7E8B0"));
+            run.Foreground = new SolidColorBrush(Color.Parse("#25323B"));
+            run.FontWeight = FontWeight.SemiBold;
         }
         return run;
     }

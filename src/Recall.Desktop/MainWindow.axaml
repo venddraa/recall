@@ -3,15 +3,25 @@
         xmlns:local="using:Recall.Desktop"
         x:Class="Recall.Desktop.MainWindow"
         Title="Recall"
-        Width="940"
-        Height="640"
+        Width="1040"
+        Height="720"
         MinWidth="740"
         MinHeight="480"
         WindowStartupLocation="CenterScreen"
-        Background="#D4D0C8">
+        Foreground="#27333E"
+        Background="#ECEFF1">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ThemeAccentBrush">#55758F</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush2">#BDD1E0</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush3">#D1E0EA</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush4">#DCE7EF</SolidColorBrush>
+    </Window.Resources>
+    <Window.Styles>
+        <StyleInclude Source="/Styles/MainWindow.axaml" />
+    </Window.Styles>
     <Grid RowDefinitions="Auto,Auto,*,Auto">
-        <Border BorderBrush="#808080" BorderThickness="0,0,0,1">
-            <Menu>
+        <Border Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,0,0,1">
+            <Menu Margin="8,2">
                 <MenuItem Header="_File">
                     <MenuItem x:Name="OpenFileMenuItem" Header="Open File" IsEnabled="False"
                               Click="OpenFile_OnClick" />
@@ -53,40 +63,45 @@
             </Menu>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="10,12">
-            <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="16,18,16,16">
+            <TextBlock Text="Search" FontWeight="SemiBold" Foreground="#485560"
+                       VerticalAlignment="Center" Margin="0,0,12,0" />
             <TextBox x:Name="SearchBox"
+                     Classes="search"
                      Grid.Column="1"
                      PlaceholderText="Enter words you remember from a file"
                      AutomationProperties.Name="Search files"
                      ToolTip.Tip="Search runs after you pause typing. Enter: search now. Ctrl+F: focus search. Down: focus results."
                      TextChanged="SearchBox_OnTextChanged"
                      KeyDown="SearchBox_OnKeyDown" />
-            <Button x:Name="FindButton" Grid.Column="2" Content="Find" MinWidth="76" Margin="8,0,0,0"
+            <Button x:Name="FindButton" Classes="primary" Grid.Column="2" Content="Find" MinWidth="92" MinHeight="42" Margin="10,0,0,0"
                     IsEnabled="False" Click="Find_OnClick" />
-            <Button x:Name="ClearSearchButton" Grid.Column="3" Content="Clear" MinWidth="76" Margin="8,0,0,0"
+            <Button x:Name="ClearSearchButton" Grid.Column="3" Content="Clear" MinWidth="76" MinHeight="42" Margin="8,0,0,0"
                     IsEnabled="False" Click="ClearSearch_OnClick"
                     ToolTip.Tip="Clear the search and its results (Escape in the search box)"
                     AutomationProperties.Name="Clear search" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,8,0,0"
+                       FontSize="12" Foreground="#5D6A75" TextWrapping="Wrap"
+                       Text="Search filenames and indexed contents.  Ctrl+F to focus · Enter to find" />
         </Grid>
 
-        <Grid Grid.Row="2" Margin="10,0,10,10">
+        <Grid Grid.Row="2" Margin="16,0,16,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" MinHeight="120" />
-                <RowDefinition Height="6" />
-                <RowDefinition Height="140" MinHeight="90" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="180" MinHeight="100" />
             </Grid.RowDefinitions>
 
-            <Border BorderBrush="#808080" BorderThickness="1" Background="White">
+            <Border BorderBrush="#CAD3DA" BorderThickness="1" CornerRadius="4" Background="White" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*,Auto">
-                    <Border Background="#D4D0C8" BorderBrush="#808080"
-                            BorderThickness="0,0,0,1" Padding="8,6">
-                        <Grid ColumnDefinitions="2*,3*,60,136,84">
-                            <TextBlock Text="Name" />
-                            <TextBlock Grid.Column="1" Text="Folder" Margin="8,0,0,0" />
-                            <TextBlock Grid.Column="2" Text="Type" Margin="8,0,0,0" />
-                            <TextBlock Grid.Column="3" Text="Modified" Margin="8,0,0,0" />
-                            <TextBlock Grid.Column="4" Text="Size" Margin="8,0,0,0" />
+                    <Border Background="#F6F8FA" BorderBrush="#DBE2E8"
+                            BorderThickness="0,0,0,1" Padding="12,10">
+                        <Grid ColumnDefinitions="2.5*,3*,60,136,84">
+                            <TextBlock Classes="column-heading" Text="Name" />
+                            <TextBlock Classes="column-heading" Grid.Column="1" Text="Folder" Margin="8,0,0,0" />
+                            <TextBlock Classes="column-heading" Grid.Column="2" Text="Type" Margin="8,0,0,0" />
+                            <TextBlock Classes="column-heading" Grid.Column="3" Text="Modified" Margin="8,0,0,0" />
+                            <TextBlock Classes="column-heading" Grid.Column="4" Text="Size" HorizontalAlignment="Right" />
                         </Grid>
                     </Border>
 
@@ -97,43 +112,39 @@
                              ContextRequested="ResultsList_OnContextRequested"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="Search results">
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                <Setter Property="Padding" Value="8,6" />
-                            </Style>
-                        </ListBox.Styles>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="local:SearchResultRow">
-                                <Grid ColumnDefinitions="2*,3*,60,136,84">
+                                <Grid ColumnDefinitions="2.5*,3*,60,136,84">
                                     <TextBlock DataContextChanged="ResultFilename_OnDataContextChanged"
+                                               FontWeight="Medium" VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Filename}"
                                                ToolTip.Tip="{Binding FullPath}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Folder}" Margin="8,0,0,0"
+                                    <TextBlock Classes="file-detail" Grid.Column="1" Text="{Binding Folder}" Margin="8,0,0,0"
                                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="8,0,0,0"
+                                    <TextBlock Classes="file-detail" Grid.Column="2" Text="{Binding Type}" FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"
                                                TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Grid.Column="3" Text="{Binding Modified}" Margin="8,0,0,0"
+                                    <TextBlock Classes="file-detail" Grid.Column="3" Text="{Binding Modified}" Margin="8,0,0,0"
                                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Modified}" />
-                                    <TextBlock Grid.Column="4" Text="{Binding Size}" Margin="8,0,0,0"
+                                    <TextBlock Classes="file-detail" Grid.Column="4" Text="{Binding Size}" HorizontalAlignment="Right"
                                                TextTrimming="CharacterEllipsis" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <StackPanel x:Name="EmptyStatePanel" Grid.Row="1" Margin="24" Spacing="6"
+                    <StackPanel x:Name="EmptyStatePanel" Grid.Row="1" Margin="28" Spacing="10"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                 IsHitTestVisible="False">
                         <TextBlock x:Name="EmptyStateTitle" Text="Loading folder settings..."
+                                   FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"
                                    HorizontalAlignment="Center" />
                         <TextBlock x:Name="EmptyStateDescription" Text=""
-                                   Foreground="#606060" TextWrapping="Wrap"
+                                   Foreground="#61707D" TextWrapping="Wrap" LineHeight="20" MaxWidth="580"
                                    TextAlignment="Center" />
                     </StackPanel>
-                    <Border Grid.Row="2" BorderBrush="#808080" BorderThickness="0,1,0,0"
-                            Background="#D4D0C8" Padding="6">
+                    <Border Grid.Row="2" BorderBrush="#DFE5EA" BorderThickness="0,1,0,0"
+                            Background="#FAFBFC" Padding="12,8">
                         <Grid ColumnDefinitions="*,Auto,Auto">
-                            <TextBlock x:Name="SearchPageText" Text="Page 1" VerticalAlignment="Center" />
+                            <TextBlock x:Name="SearchPageText" Classes="status-text" Text="Page 1" />
                             <Button x:Name="PreviousPageButton" Grid.Column="1" Content="Previous" MinWidth="86"
                                     IsEnabled="False" Click="PreviousPage_OnClick" Margin="8,0,0,0"
                                     ToolTip.Tip="Previous results page (Ctrl+Page Up)"
@@ -150,20 +161,24 @@
             <GridSplitter Grid.Row="1" ResizeDirection="Rows"
                           ResizeBehavior="PreviousAndNext"
                           HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                          Background="#D4D0C8"
+                          Background="Transparent"
                           AutomationProperties.Name="Resize content preview" />
 
-            <Border Grid.Row="2" BorderBrush="#808080" BorderThickness="1">
+            <Border Grid.Row="2" BorderBrush="#CAD3DA" BorderThickness="1" CornerRadius="4"
+                    Background="White" ClipToBounds="True">
                 <Grid RowDefinitions="Auto,*">
-                    <Border BorderBrush="#808080" BorderThickness="0,0,0,1" Padding="8,5">
-                        <TextBlock Text="Content preview" />
+                    <Border Background="#F8FAFB" BorderBrush="#E0E6EB" BorderThickness="0,0,0,1" Padding="12,8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Content preview" Classes="column-heading" />
+                            <TextBlock Grid.Column="1" Text="Select text to copy · Ctrl+C" FontSize="11" Foreground="#61707D" />
+                        </Grid>
                     </Border>
-                    <ScrollViewer x:Name="ContentPreviewScroll" Grid.Row="1" Background="#F5F5F5"
+                    <ScrollViewer x:Name="ContentPreviewScroll" Grid.Row="1" Background="White"
                                   HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto">
                         <SelectableTextBlock x:Name="ContentPreview" TextWrapping="Wrap"
-                                             Foreground="#606060" Padding="10" Focusable="True"
-                                             SelectionBrush="#CDE8F5" SelectionForegroundBrush="Black"
+                                             Foreground="#34424E" FontSize="14" LineHeight="22" Padding="14,12" Focusable="True"
+                                             SelectionBrush="#D9E5EF" SelectionForegroundBrush="#25323B"
                                              Text="Select a search result to see its matching text."
                                              AutomationProperties.Name="Matching file content" />
                     </ScrollViewer>
@@ -171,23 +186,25 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="3" BorderBrush="#808080" BorderThickness="0,1,0,0"
-                Padding="10,6">
-            <Grid ColumnDefinitions="2*,Auto,Auto,3*,Auto" MinHeight="24">
-                <TextBlock x:Name="ResultCountText" Text="0 results"
+        <Border Grid.Row="3" Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,1,0,0"
+                Padding="16,8">
+            <Grid ColumnDefinitions="1.5*,Auto,Auto,2.5*,Auto" MinHeight="26">
+                <TextBlock x:Name="ResultCountText" Classes="status-text" FontWeight="SemiBold" Text="0 results"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding #ResultCountText.Text}" />
-                <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="Folders: 0" Margin="16,0,0,0"
+                <TextBlock x:Name="FolderCountText" Classes="status-text" Grid.Column="1" Text="Folders: 0" Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            ToolTip.Tip="{Binding #FolderCountText.Text}" />
-                <TextBlock x:Name="StoredFileCountText" Grid.Column="2" Text="Stored files: 0" Margin="16,0"
+                <TextBlock x:Name="StoredFileCountText" Classes="status-text" Grid.Column="2" Text="Stored files: 0" Margin="12,0"
                            VerticalAlignment="Center"
                            ToolTip.Tip="{Binding #StoredFileCountText.Text}" />
-                <TextBlock x:Name="IndexStatusText" Grid.Column="3" Text="Index: Loading settings"
+                <Border Grid.Column="3" Background="#E5EDF2" CornerRadius="3" Padding="8,4" VerticalAlignment="Center">
+                <TextBlock x:Name="IndexStatusText" Classes="status-text" Text="Index: Loading settings"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding #IndexStatusText.Text}" />
+                </Border>
                 <Button x:Name="CancelScanButton" Grid.Column="4" Content="Cancel Scan"
                         IsVisible="False" IsEnabled="False" MinWidth="100" MinHeight="24"
                         Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center"

@@ -1,0 +1,100 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Scoped to the main window; keep the standard SimpleTheme templates. -->
+    <Style Selector="Button">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Background" Value="#FFFFFF" />
+        <Setter Property="BorderBrush" Value="#BCC6CE" />
+        <Setter Property="Foreground" Value="#2D3B47" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#EAF0F4" />
+        <Setter Property="BorderBrush" Value="#9CAEBB" />
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#DCE5EC" />
+    </Style>
+    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="#55758F" />
+    </Style>
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="#516E84" />
+        <Setter Property="BorderBrush" Value="#516E84" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#445F75" />
+        <Setter Property="BorderBrush" Value="#445F75" />
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#374F63" />
+    </Style>
+    <Style Selector="Button.primary:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="#243F54" />
+    </Style>
+    <Style Selector="TextBox.search">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="MinHeight" Value="42" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="Foreground" Value="#27333E" />
+        <Setter Property="PlaceholderForeground" Value="#687580" />
+        <Setter Property="BorderBrush" Value="#BCC6CE" />
+        <Setter Property="SelectionBrush" Value="#D9E5EF" />
+        <Setter Property="SelectionForegroundBrush" Value="#25323B" />
+    </Style>
+    <Style Selector="TextBox.search:pointerover /template/ Border#border">
+        <Setter Property="BorderBrush" Value="#9CAEBB" />
+    </Style>
+    <Style Selector="TextBox.search:focus /template/ Border#border">
+        <Setter Property="BorderBrush" Value="#55758F" />
+    </Style>
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="MenuItem">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Foreground" Value="#3D4B57" />
+        <Setter Property="CornerRadius" Value="3" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderBrush" Value="#E8EDF1" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#F0F4F7" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#DCE7EF" />
+        <Setter Property="BorderBrush" Value="#CBD8E2" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#D1E0EA" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#D1E0EA" />
+    </Style>
+    <Style Selector="TextBlock.column-heading">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="#4C5965" />
+    </Style>
+    <Style Selector="TextBlock.file-detail">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="#61707D" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ListBox#ResultsList ListBoxItem:selected TextBlock.file-detail">
+        <Setter Property="Foreground" Value="#455662" />
+    </Style>
+    <Style Selector="TextBlock.status-text">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="#5D6A75" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+</Styles>
