@@ -15,12 +15,14 @@ public partial class IndexedFoldersWindow : Window
     private readonly ObservableCollection<string> _folders = new();
     private bool _busy;
     private bool _canIndex;
+    private int _folderStatusCheck;
 
     public IndexedFoldersWindow()
     {
         AvaloniaXamlLoader.Load(this);
         this.FindControl<ListBox>("FoldersList")!.ItemsSource = _folders;
         Closing += (_, e) => e.Cancel = _busy;
+        Closed += (_, _) => _folderStatusCheck++;
         RefreshControls();
     }
 
@@ -161,9 +163,45 @@ public partial class IndexedFoldersWindow : Window
         }
     }
 
-    private void FoldersList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void FoldersList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         RefreshControls();
+        var check = ++_folderStatusCheck;
+        var status = this.FindControl<TextBlock>("FolderStatusText")!;
+        status.Foreground = Brushes.DimGray;
+        if (this.FindControl<ListBox>("FoldersList")!.SelectedItem is not string path)
+        {
+            status.Text = "Select a folder to check its location.";
+            return;
+        }
+
+        status.Text = "Checking folder location...";
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                if (!Directory.Exists(path))
+                    return (Text: "Folder unavailable. Check its location, drive, and permissions.", Error: true);
+                if (FolderPath.HasSymbolicLink(path))
+                    return (Text: "Symbolic link detected. Choose the folder at its original location.", Error: true);
+                return (Text: "Folder exists. Scan Folder checks access to its files.", Error: false);
+            });
+            // A slow check for an old selection must not overwrite the current
+            // folder's status, or update a dialog that has already closed.
+            if (check != _folderStatusCheck || !IsVisible)
+                return;
+            status.Text = result.Text;
+            status.Foreground = result.Error ? Brushes.DarkRed : Brushes.DimGray;
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning("Could not check selected folder: {0}: {1}", path, exception.GetType().Name);
+            if (check == _folderStatusCheck && IsVisible)
+            {
+                status.Text = "Could not check folder. Check its location and permissions.";
+                status.Foreground = Brushes.DarkRed;
+            }
+        }
     }
 
     private void Close_OnClick(object? sender, RoutedEventArgs e)

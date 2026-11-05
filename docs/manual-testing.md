@@ -71,6 +71,14 @@ picker otomatis memakai lokasi asli, folder dapat ditambahkan seperti biasa.
 Path link yang sudah tersimpan dari versi sebelumnya dapat dihapus dari daftar
 lalu diganti dengan lokasi aslinya; dokumen tidak perlu dipindahkan.
 
+Di Indexed Folders, klik satu folder dan periksa status lokasinya di bawah daftar.
+Folder normal harus berstatus ada; folder yang tidak tersedia atau path symlink
+menampilkan penjelasan. Status ini memeriksa lokasi folder, sedangkan Scan Folder
+tetap memeriksa akses ke file individual. Berpindahlah cepat antara dua folder:
+hasil pemeriksaan folder lama tidak boleh mengganti status pilihan terbaru.
+Untuk mengecek folder yang sama setelah drive disambungkan kembali, buka ulang
+dialog lalu pilih folder tersebut.
+
 Untuk menguji PDF dan DOCX, tambahkan dokumen uji `opaque-b.pdf` dan
 `opaque-c.docx` yang berisi kalimat sama ke folder tersebut, lalu pilih
 **Index → Scan Folders**. Gunakan PDF dengan text layer, bukan hasil scan gambar.
