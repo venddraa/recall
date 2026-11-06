@@ -186,3 +186,11 @@ pribadi; periksa isinya sebelum membagikannya.
    Isi penjelasan tetap dapat dibaca; tidak ada teks terpotong di sisi kanan.
 3. Perkecil dialog hingga ukuran minimum. Area bantuan tetap bisa di-scroll,
    sedangkan tombol Close selalu terlihat. Coba Enter dan Escape untuk menutup.
+
+## 10. Review dialog About Recall
+
+1. Buka Help → About Recall. Deskripsi aplikasi dan versi build harus terbaca
+   jelas, dengan tombol OK yang konsisten dengan dialog lain.
+2. Pilih teks versi, tekan Ctrl+C, lalu tempel ke editor teks. Jika versi build
+   panjang, kotak versi tetap dapat di-scroll tanpa memotong dialog.
+3. Tutup melalui OK, Enter, dan Escape.

@@ -2,23 +2,40 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Recall.Desktop.AboutWindow"
         Title="About Recall"
-        Width="480"
+        Width="520"
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#D4D0C8">
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="20">
-        <TextBlock Text="Recall" FontWeight="Bold" />
-        <TextBlock Grid.Row="1" Margin="0,12,0,16" TextWrapping="Wrap"
-                   Text="Find local files by the words you remember.&#10;&#10;Your files stay on your computer." />
-        <TextBlock Grid.Row="2" Text="Version / build" Margin="0,0,0,6" />
-        <TextBox x:Name="BuildVersionText" Grid.Row="3" IsReadOnly="True"
-                 TextWrapping="Wrap" MaxHeight="100"
-                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                 ToolTip.Tip="Select and copy this version when reporting a problem. Build metadata includes the base source commit when available."
-                 AutomationProperties.Name="Recall version and build metadata" />
-        <Button Grid.Row="4" Content="OK" MinWidth="76" Margin="0,16,0,0"
-                HorizontalAlignment="Right" IsDefault="True" IsCancel="True"
-                Click="Close_OnClick" />
+        Background="#ECEFF1" Foreground="#27333E">
+    <Window.Styles>
+        <StyleInclude Source="/Styles/UtilityButtons.axaml" />
+    </Window.Styles>
+    <Grid RowDefinitions="Auto,Auto,Auto">
+        <Border Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,0,0,1" Padding="18,16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Recall" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Local file search for your desktop." Foreground="#5D6A75" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="1" Margin="18,16" Spacing="12">
+            <TextBlock TextWrapping="Wrap" FontSize="14"
+                       Text="Find local files by the words you remember.&#10;&#10;Your files stay on your computer." />
+            <StackPanel Spacing="6">
+                <TextBlock Text="Version / build" FontSize="12" FontWeight="SemiBold" Foreground="#4C5965" />
+                <TextBox x:Name="BuildVersionText" IsReadOnly="True"
+                         TextWrapping="Wrap" MinHeight="40" MaxHeight="100"
+                         Background="White" BorderBrush="#CAD3DA" CornerRadius="4"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ToolTip.Tip="Select and copy this version when reporting a problem. Build metadata includes the base source commit when available."
+                         AutomationProperties.Name="Recall version and build metadata" />
+            </StackPanel>
+        </StackPanel>
+
+        <Border Grid.Row="2" Background="#F5F7F8" BorderBrush="#D6DDE3"
+                BorderThickness="0,1,0,0" Padding="18,12">
+            <Button Content="OK" MinWidth="84" HorizontalAlignment="Right"
+                    IsDefault="True" IsCancel="True" Click="Close_OnClick" />
+        </Border>
     </Grid>
 </Window>
