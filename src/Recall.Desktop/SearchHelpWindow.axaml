@@ -2,15 +2,26 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Recall.Desktop.SearchHelpWindow"
         Title="Recall Search Tips"
-        Width="620" Height="540" MinWidth="480" MinHeight="360"
-        WindowStartupLocation="CenterOwner" Background="#D4D0C8">
-    <Grid RowDefinitions="*,Auto" Margin="14">
-        <Border BorderBrush="#808080" BorderThickness="1" Background="White">
+        Width="680" Height="620" MinWidth="500" MinHeight="400"
+        WindowStartupLocation="CenterOwner" Background="#ECEFF1" Foreground="#27333E">
+    <Window.Styles>
+        <StyleInclude Source="/Styles/UtilityButtons.axaml" />
+    </Window.Styles>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,0,0,1" Padding="18,16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Search tips" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="How to find files, update the index, and use keyboard shortcuts."
+                           Foreground="#5D6A75" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+        <Border Grid.Row="1" Margin="18,14" BorderBrush="#CAD3DA" BorderThickness="1"
+                CornerRadius="4" Background="White" ClipToBounds="True">
             <ScrollViewer x:Name="HelpContentScroll" Focusable="True"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="14" Spacing="10">
-                    <TextBlock Text="Find a file by what you remember" FontWeight="Bold" />
+                <StackPanel Margin="18,16" Spacing="10">
+                    <TextBlock Text="Find a file by what you remember" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock Text="Choose Index → Indexed Folders, add and select a folder, then click Scan Folder. To scan all selected folders, use Index → Scan Folders. Type words from a filename or its contents; results appear when you pause typing."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Recall skips symbolic links. When adding a folder, choose its original location without linked parent folders. If your folder picker resolves a shortcut to the original path, that original folder can be added normally. Older saved linked paths remain in the list until you remove them."
@@ -23,7 +34,7 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="Opening Indexed Folders and closing it without changing the folder list keeps your results page and selection. Changing the list clears the old results and reruns an existing query on page 1 if folders remain selected. Automatic updates pause while this dialog is open; use Scan Folders to catch changes made during that time or to index a newly added folder."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Search rules" FontWeight="Bold" Margin="0,6,0,0" />
+                    <TextBlock Text="Search rules" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
                     <TextBlock Text="Every word must match the filename or indexed content, in any order. For example, clear sky index can match clear-sky index. Quotes do not request an exact phrase."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Matching words are highlighted in filenames and content previews. A match found only in file contents does not highlight unrelated words in the filename."
@@ -36,7 +47,7 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="Refresh Results and automatic result updates preserve selected preview text and its scroll position when the selected file and snippet text are unchanged. If the snippet changes or the file leaves the page, the preview text selection is cleared."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="If a file is missing" FontWeight="Bold" Margin="0,6,0,0" />
+                    <TextBlock Text="If a file is missing" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
                     <TextBlock Text="Check that its folder is selected, then choose Scan Folder in Indexed Folders, or Scan Folders for all selected folders. Changes made while Recall was closed need a scan; Tools → Settings can enable scanning on startup."
                                TextWrapping="Wrap" />
                     <TextBlock Text="Content search supports plain-text files up to 5 MiB, and text-layer PDFs, DOCX documents and IPYNB notebooks up to 20 MiB. Scanned images are not read as text. Files whose contents cannot be indexed can still match their names."
@@ -51,7 +62,7 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="For troubleshooting across restarts, choose Tools → Open Log Folder. Application warnings and errors are stored locally in recall.log, with one rotated backup recall.log.1. Logs may contain file paths; document contents are not recorded."
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Keyboard shortcuts" FontWeight="Bold" Margin="0,6,0,0" />
+                    <TextBlock Text="Keyboard shortcuts" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="18">
                         <TextBlock Text="Ctrl+F" />
                         <TextBlock Grid.Column="1" Text="Focus and select the search text" TextWrapping="Wrap" />
@@ -79,8 +90,10 @@
                 </StackPanel>
             </ScrollViewer>
         </Border>
-        <Button Grid.Row="1" Content="Close" MinWidth="76" Margin="0,12,0,0"
-                HorizontalAlignment="Right" IsDefault="True" IsCancel="True"
-                Click="Close_OnClick" />
+        <Border Grid.Row="2" Background="#F5F7F8" BorderBrush="#D6DDE3"
+                BorderThickness="0,1,0,0" Padding="18,12">
+            <Button Content="Close" MinWidth="84" HorizontalAlignment="Right"
+                    IsDefault="True" IsCancel="True" Click="Close_OnClick" />
+        </Border>
     </Grid>
 </Window>

@@ -176,3 +176,13 @@ pribadi; periksa isinya sebelum membagikannya.
 4. Perkecil dialog hingga ukuran minimum. Daftar masalah bisa di-scroll dan
    tombol Copy Report serta Close tetap terlihat. Coba juga laporan tanpa
    detail masalah: pesan kosong harus tampak di tengah daftar.
+
+## 9. Review dialog Search Tips
+
+1. Buka Help → Search Tips atau tekan F1. Judul dan bagian Find a file,
+   Search rules, If a file is missing, serta Keyboard shortcuts harus mudah
+   dibedakan saat membaca.
+2. Scroll dengan mouse dan keyboard sampai daftar shortcut paling bawah.
+   Isi penjelasan tetap dapat dibaca; tidak ada teks terpotong di sisi kanan.
+3. Perkecil dialog hingga ukuran minimum. Area bantuan tetap bisa di-scroll,
+   sedangkan tombol Close selalu terlihat. Coba Enter dan Escape untuk menutup.
