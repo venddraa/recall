@@ -1,0 +1,29 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StyleInclude Source="/Styles/UtilityButtons.axaml" />
+    <Styles.Resources>
+        <SolidColorBrush x:Key="ThemeAccentBrush">#55758F</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush2">#BDD1E0</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush3">#D1E0EA</SolidColorBrush>
+        <SolidColorBrush x:Key="ThemeAccentBrush4">#DCE7EF</SolidColorBrush>
+    </Styles.Resources>
+    <Style Selector="ListBox#FoldersList ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderBrush" Value="#E8EDF1" />
+    </Style>
+    <Style Selector="ListBox#FoldersList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#F0F4F7" />
+    </Style>
+    <Style Selector="ListBox#FoldersList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#DCE7EF" />
+        <Setter Property="BorderBrush" Value="#CBD8E2" />
+    </Style>
+    <Style Selector="ListBox#FoldersList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#D1E0EA" />
+    </Style>
+    <Style Selector="ListBox#FoldersList ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#D1E0EA" />
+    </Style>
+</Styles>

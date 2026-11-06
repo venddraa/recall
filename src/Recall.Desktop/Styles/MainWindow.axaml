@@ -1,42 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- Scoped to the main window; keep the standard SimpleTheme templates. -->
-    <Style Selector="Button">
-        <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="14,6" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Background" Value="#FFFFFF" />
-        <Setter Property="BorderBrush" Value="#BCC6CE" />
-        <Setter Property="Foreground" Value="#2D3B47" />
-    </Style>
-    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#EAF0F4" />
-        <Setter Property="BorderBrush" Value="#9CAEBB" />
-    </Style>
-    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#DCE5EC" />
-    </Style>
-    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="BorderBrush" Value="#55758F" />
-    </Style>
-    <Style Selector="Button.primary">
-        <Setter Property="Background" Value="#516E84" />
-        <Setter Property="BorderBrush" Value="#516E84" />
-        <Setter Property="Foreground" Value="White" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#445F75" />
-        <Setter Property="BorderBrush" Value="#445F75" />
-    </Style>
-    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#374F63" />
-    </Style>
-    <Style Selector="Button.primary:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="BorderBrush" Value="#243F54" />
-    </Style>
+    <StyleInclude Source="/Styles/UtilityButtons.axaml" />
     <Style Selector="TextBox.search">
         <Setter Property="CornerRadius" Value="4" />
         <Setter Property="MinHeight" Value="42" />

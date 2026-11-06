@@ -166,6 +166,7 @@ public partial class IndexedFoldersWindow : Window
     private async void FoldersList_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         RefreshControls();
+        this.FindControl<ScrollViewer>("FolderInfoScroll")!.Offset = default;
         var check = ++_folderStatusCheck;
         var status = this.FindControl<TextBlock>("FolderStatusText")!;
         status.Foreground = Brushes.DimGray;
@@ -217,6 +218,10 @@ public partial class IndexedFoldersWindow : Window
 
     private void RefreshControls()
     {
+        this.FindControl<TextBlock>("FolderCountText")!.Text = _folders.Count == 1
+            ? "1 folder" : $"{_folders.Count:N0} folders";
+        this.FindControl<Button>("AddFolderButton")!.Classes.Set("primary", _folders.Count == 0);
+        this.FindControl<Button>("ScanFolderButton")!.Classes.Set("primary", _folders.Count > 0);
         this.FindControl<Button>("AddFolderButton")!.IsEnabled = !_busy && _store is not null;
         this.FindControl<Button>("RemoveFolderButton")!.IsEnabled = !_busy && _store is not null
             && this.FindControl<ListBox>("FoldersList")!.SelectedItem is string;
@@ -230,6 +235,7 @@ public partial class IndexedFoldersWindow : Window
 
     private void ShowMessage(string text, bool isError = false)
     {
+        this.FindControl<ScrollViewer>("FolderInfoScroll")!.Offset = default;
         var message = this.FindControl<TextBlock>("MessageText")!;
         message.Text = text;
         message.Foreground = isError ? Brushes.DarkRed : Brushes.Black;

@@ -132,3 +132,21 @@ pribadi; periksa isinya sebelum membagikannya.
 5. Periksa query tanpa hasil serta scan yang berjalan. Pada jendela pendek,
    pesan panjang dapat di-scroll di dalam area hasil. Tombol pagination dan
    Cancel Scan tetap berada pada tempatnya.
+
+## 6. Review dialog Indexed Folders
+
+1. Buka Index → Indexed Folders. Warna, tombol, dan selection harus konsisten
+   dengan jendela utama. Jumlah folder terlihat pada header daftar.
+2. Saat daftar kosong, Add Folder menjadi tombol utama. Setelah ada folder,
+   Scan Folder menjadi tombol utama; tombol scan tetap perlu pilihan baris.
+3. Tambah atau hapus pilihan folder uji dan pastikan jumlahnya ikut berubah.
+   Coba hover, selection, serta Tab untuk berpindah antar kontrol.
+4. Periksa path panjang: horizontal scroll dan tooltip menampilkan path lengkap.
+5. Perkecil dialog, lalu periksa pesan/status yang panjang. Area informasi dapat
+   di-scroll, sementara tombol Close dan aksi folder tetap dapat dijangkau.
+   Setelah memilih folder lain atau menjalankan aksi, status/pesan baru kembali
+   terlihat di bagian atas area informasi.
+6. Jalankan Scan Folder dan Reindex Folder untuk memastikan keduanya menutup
+   dialog dan memproses folder yang dipilih seperti pada langkah sebelumnya.
+7. Kembali ke jendela utama dan periksa tombol Find/Clear serta fokus keyboard:
+   style tombol bersama harus tetap konsisten pada kedua jendela.

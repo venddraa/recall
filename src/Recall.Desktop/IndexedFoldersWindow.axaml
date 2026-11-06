@@ -2,47 +2,83 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Recall.Desktop.IndexedFoldersWindow"
         Title="Indexed Folders"
-        Width="700" Height="440" MinWidth="600" MinHeight="380"
-        WindowStartupLocation="CenterOwner" Background="#D4D0C8">
-    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="14">
-        <TextBlock Text="Choose the folders Recall may index." Margin="0,0,0,10" />
-
-        <Border Grid.Row="1" BorderBrush="#808080" BorderThickness="1" Background="White">
-            <Grid>
-                <ListBox x:Name="FoldersList" BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         SelectionChanged="FoldersList_OnSelectionChanged"
-                         AutomationProperties.Name="Selected folders" />
-                <TextBlock x:Name="EmptyFoldersText" Text="No folders selected."
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="#606060" IsHitTestVisible="False" />
-            </Grid>
+        Width="760" Height="520" MinWidth="600" MinHeight="440"
+        WindowStartupLocation="CenterOwner" Background="#ECEFF1" Foreground="#27333E">
+    <Window.Styles>
+        <StyleInclude Source="/Styles/IndexedFoldersWindow.axaml" />
+    </Window.Styles>
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,0,0,1" Padding="18,16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Indexed folders" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="Select a folder to scan it, or add a new location."
+                           Foreground="#5D6A75" TextWrapping="Wrap" />
+            </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-            <Button x:Name="AddFolderButton" Content="Add Folder..." Click="AddFolder_OnClick" />
-            <Button x:Name="RemoveFolderButton" Content="Remove Folder" IsEnabled="False"
-                    Click="RemoveFolder_OnClick" />
-            <Button x:Name="ScanFolderButton" Content="Scan Folder" IsEnabled="False"
-                    Click="ScanFolder_OnClick"
-                    ToolTip.Tip="Update only the selected folder, reusing unchanged file contents" />
-            <Button x:Name="ReindexFolderButton" Content="Reindex Folder" IsEnabled="False"
-                    Click="ReindexFolder_OnClick"
-                    ToolTip.Tip="Reread all supported file contents in the selected folder" />
-        </StackPanel>
+        <Grid Grid.Row="1" RowDefinitions="*,Auto,Auto" Margin="18,14">
+            <Border BorderBrush="#CAD3DA" BorderThickness="1" CornerRadius="4" Background="White" MinHeight="80"
+                    ClipToBounds="True">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Background="#F6F8FA" BorderBrush="#DFE5EA" BorderThickness="0,0,0,1" Padding="12,8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Folders" FontSize="12" FontWeight="SemiBold" Foreground="#4C5965" />
+                            <TextBlock x:Name="FolderCountText" Grid.Column="1" Text="0 folders" FontSize="12" Foreground="#5D6A75" />
+                        </Grid>
+                    </Border>
+                    <ListBox x:Name="FoldersList" Grid.Row="1" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             SelectionChanged="FoldersList_OnSelectionChanged"
+                             AutomationProperties.Name="Selected folders">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" ToolTip.Tip="{Binding}" VerticalAlignment="Center" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="EmptyFoldersText" Grid.Row="1" Text="No folders selected.&#10;Add a folder to start indexing."
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="#61707D" Margin="20" TextWrapping="Wrap" TextAlignment="Center"
+                               IsHitTestVisible="False" />
+                </Grid>
+            </Border>
 
-        <StackPanel Grid.Row="3" Spacing="6" Margin="0,10,0,10">
-            <TextBlock x:Name="MessageText" IsVisible="False" TextWrapping="Wrap" />
-            <TextBlock x:Name="FolderStatusText" Text="Select a folder to check its location."
-                       Foreground="#606060" TextWrapping="Wrap"
-                       AutomationProperties.Name="Selected folder location status" />
-            <TextBlock Text="Changes are saved immediately. Removing a folder does not delete its files."
-                       Foreground="#606060" TextWrapping="Wrap" />
-            <TextBlock Text="Scan Folder checks changes and reuses unchanged contents. Reindex Folder rereads all supported contents. Both close this dialog and process only the selected folder."
-                       Foreground="#606060" TextWrapping="Wrap" />
-        </StackPanel>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+                <Button x:Name="AddFolderButton" Content="Add Folder..." Click="AddFolder_OnClick" />
+                <Button x:Name="RemoveFolderButton" Content="Remove Folder" IsEnabled="False"
+                        Click="RemoveFolder_OnClick" />
+                <Button x:Name="ScanFolderButton" Content="Scan Folder" IsEnabled="False"
+                        Click="ScanFolder_OnClick"
+                        ToolTip.Tip="Update only the selected folder, reusing unchanged file contents" />
+                <Button x:Name="ReindexFolderButton" Content="Reindex Folder" IsEnabled="False"
+                        Click="ReindexFolder_OnClick"
+                        ToolTip.Tip="Reread all supported file contents in the selected folder" />
+            </StackPanel>
 
-        <Button x:Name="CloseButton" Grid.Row="4" Content="Close" MinWidth="76"
-                HorizontalAlignment="Right" IsCancel="True" Click="Close_OnClick" />
+            <ScrollViewer x:Name="FolderInfoScroll" Grid.Row="2" MaxHeight="128" Margin="0,12,0,0" Background="Transparent"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                          AutomationProperties.Name="Folder status and instructions">
+                <StackPanel Spacing="6">
+                    <Border IsVisible="{Binding #MessageText.IsVisible}" Background="#F6F8FA"
+                            BorderBrush="#D9E2E9" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                        <TextBlock x:Name="MessageText" IsVisible="False" TextWrapping="Wrap" />
+                    </Border>
+                    <Border Background="#E5EDF2" CornerRadius="4" Padding="10,8">
+                        <TextBlock x:Name="FolderStatusText" Text="Select a folder to check its location."
+                                   Foreground="#5D6A75" TextWrapping="Wrap"
+                                   AutomationProperties.Name="Selected folder location status" />
+                    </Border>
+                    <TextBlock Text="Changes are saved immediately. Removing a folder does not delete its files."
+                               Foreground="#5D6A75" FontSize="12" TextWrapping="Wrap" />
+                    <TextBlock Text="Scan Folder checks changes and reuses unchanged contents. Reindex Folder rereads all supported contents. Both close this dialog and process only the selected folder."
+                               Foreground="#5D6A75" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Border Grid.Row="2" Background="#F5F7F8" BorderBrush="#D6DDE3" BorderThickness="0,1,0,0" Padding="18,12">
+            <Button x:Name="CloseButton" Content="Close" MinWidth="84"
+                    HorizontalAlignment="Right" IsCancel="True" Click="Close_OnClick" />
+        </Border>
     </Grid>
 </Window>
