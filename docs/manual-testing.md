@@ -150,3 +150,17 @@ pribadi; periksa isinya sebelum membagikannya.
    dialog dan memproses folder yang dipilih seperti pada langkah sebelumnya.
 7. Kembali ke jendela utama dan periksa tombol Find/Clear serta fokus keyboard:
    style tombol bersama harus tetap konsisten pada kedua jendela.
+
+## 7. Review dialog Settings
+
+1. Buka Tools → Settings. Kedua pilihan indexing harus terbaca dalam bagian
+   terpisah, dengan Save sebagai tombol utama dan Cancel di sampingnya.
+2. Ubah salah satu pilihan lalu klik Cancel. Buka kembali Settings dan pastikan
+   nilai sebelumnya tetap ada. Ubah lagi lalu klik Save; buka kembali dan
+   pastikan pilihan baru tersimpan.
+3. Perkecil dialog sampai ukuran minimum. Penjelasan kedua pilihan tetap dapat
+   di-scroll, sementara tombol Save dan Cancel tetap terlihat.
+4. Coba Tab, Space pada checkbox, Enter untuk Save, dan Escape untuk Cancel.
+   Fokus serta status checkbox harus terlihat jelas.
+5. Jika penyimpanan gagal atau berkas settings tidak dapat dibaca, pesan error
+   harus tetap terlihat di atas tombol tanpa menutupi opsi atau aksi.
