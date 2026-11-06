@@ -118,3 +118,17 @@ di-index versi lama, pilih foldernya di Indexed Folders lalu **Reindex Folder**.
 Jika hasil tidak sesuai, catat query, nama/jenis file, status scan, dan informasi
 versi dari **Help → About Recall...**. Laporan scan dan log lokal dapat memuat path
 pribadi; periksa isinya sebelum membagikannya.
+
+## 5. Review tampilan jendela utama
+
+1. Periksa pada ukuran awal dan ketika diperkecil sampai minimum: input Search,
+   Find, Clear, pagination, dan status bawah harus tetap dapat digunakan.
+2. Arahkan mouse ke tombol serta baris hasil, lalu pilih salah satu hasil.
+   Hover, selection, teks folder/tanggal/ukuran, dan highlight harus terbaca jelas.
+3. Gunakan Ctrl+F dan Tab untuk memeriksa fokus keyboard. Enter menjalankan
+   pencarian; shortcut hasil dan menu tetap mengikuti bagian sebelumnya.
+4. Path pada preview memakai ukuran lebih kecil dan warna lebih redup daripada
+   snippet. Coba pilih teks, Ctrl+C, resize panel dengan pemisahnya, dan refresh.
+5. Periksa query tanpa hasil serta scan yang berjalan. Pada jendela pendek,
+   pesan panjang dapat di-scroll di dalam area hasil. Tombol pagination dan
+   Cancel Scan tetap berada pada tempatnya.

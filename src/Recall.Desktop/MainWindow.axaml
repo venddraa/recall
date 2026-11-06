@@ -89,7 +89,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" MinHeight="120" />
                 <RowDefinition Height="10" />
-                <RowDefinition Height="180" MinHeight="100" />
+                <RowDefinition Height="160" MinHeight="100" />
             </Grid.RowDefinitions>
 
             <Border BorderBrush="#CAD3DA" BorderThickness="1" CornerRadius="4" Background="White" ClipToBounds="True">
@@ -131,16 +131,20 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <StackPanel x:Name="EmptyStatePanel" Grid.Row="1" Margin="28" Spacing="10"
-                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                                IsHitTestVisible="False">
-                        <TextBlock x:Name="EmptyStateTitle" Text="Loading folder settings..."
-                                   FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock x:Name="EmptyStateDescription" Text=""
-                                   Foreground="#61707D" TextWrapping="Wrap" LineHeight="20" MaxWidth="580"
-                                   TextAlignment="Center" />
-                    </StackPanel>
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding #EmptyStatePanel.IsVisible}" Background="Transparent"
+                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                  AutomationProperties.Name="Search and indexing status details">
+                        <StackPanel x:Name="EmptyStatePanel" Margin="24,16" Spacing="10"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    IsHitTestVisible="False">
+                            <TextBlock x:Name="EmptyStateTitle" Text="Loading folder settings..."
+                                       FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock x:Name="EmptyStateDescription" Text=""
+                                       Foreground="#61707D" TextWrapping="Wrap" LineHeight="20" MaxWidth="580"
+                                       TextAlignment="Center" />
+                        </StackPanel>
+                    </ScrollViewer>
                     <Border Grid.Row="2" BorderBrush="#DFE5EA" BorderThickness="0,1,0,0"
                             Background="#FAFBFC" Padding="12,8">
                         <Grid ColumnDefinitions="*,Auto,Auto">
@@ -200,10 +204,10 @@
                            VerticalAlignment="Center"
                            ToolTip.Tip="{Binding #StoredFileCountText.Text}" />
                 <Border Grid.Column="3" Background="#E5EDF2" CornerRadius="3" Padding="8,4" VerticalAlignment="Center">
-                <TextBlock x:Name="IndexStatusText" Classes="status-text" Text="Index: Loading settings"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"
-                           ToolTip.Tip="{Binding #IndexStatusText.Text}" />
+                    <TextBlock x:Name="IndexStatusText" Classes="status-text" Text="Index: Loading settings"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding #IndexStatusText.Text}" />
                 </Border>
                 <Button x:Name="CancelScanButton" Grid.Column="4" Content="Cancel Scan"
                         IsVisible="False" IsEnabled="False" MinWidth="100" MinHeight="24"
