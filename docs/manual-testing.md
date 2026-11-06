@@ -164,3 +164,15 @@ pribadi; periksa isinya sebelum membagikannya.
    Fokus serta status checkbox harus terlihat jelas.
 5. Jika penyimpanan gagal atau berkas settings tidak dapat dibaca, pesan error
    harus tetap terlihat di atas tombol tanpa menutupi opsi atau aksi.
+
+## 8. Review dialog Last Completed Scan
+
+1. Selesaikan Scan Folders, lalu buka Index → Last Completed Scan. Ringkasan,
+   daftar sample masalah, dan detail pilihan harus mudah dibedakan.
+2. Pilih baris masalah yang berbeda. Path dan alasan lengkap muncul di kotak
+   Selected issue; path panjang tetap dapat dibaca dengan scroll atau tooltip.
+3. Klik Copy Report, tempel ke editor teks, dan cocokkan ringkasan serta sample
+   masalahnya. Status penyalinan harus muncul di samping tombol.
+4. Perkecil dialog hingga ukuran minimum. Daftar masalah bisa di-scroll dan
+   tombol Copy Report serta Close tetap terlihat. Coba juga laporan tanpa
+   detail masalah: pesan kosong harus tampak di tengah daftar.
