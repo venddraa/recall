@@ -16,15 +16,26 @@ printf '<Project />\n' > "$fixture_project/src/Recall.Desktop/Recall.Desktop.csp
 cat > "$fake_bin/dotnet" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == msbuild ]]; then
+    [[ " $* " == *' -getProperty:NETCoreSdkRuntimeIdentifier '* ]]
+    printf 'fedora.44-x64\n'
+    exit 0
+fi
 [[ "${1:-}" == publish ]]
 output=''
+runtime=''
+self_contained=''
 while (( $# )); do
     case "$1" in
         --output) output=$2; shift 2 ;;
+        --runtime) runtime=$2; shift 2 ;;
+        --self-contained) self_contained=$2; shift 2 ;;
         *) shift ;;
     esac
 done
 [[ -n "$output" ]]
+[[ "$runtime" == 'fedora.44-x64' && "$self_contained" == false ]]
+[[ "${RECALL_TEST_FAIL_PUBLISH:-0}" != 1 ]]
 mkdir -p -- "$output"
 cat > "$output/Recall.Desktop" <<APP
 #!/usr/bin/env bash
@@ -77,6 +88,7 @@ run_installer() {
     PATH="$fake_bin:$PATH" XDG_DATA_HOME="$data_home" \
         RECALL_TEST_BUILD_TAG="$tag" RECALL_TEST_DESKTOP="$desktop_dir" \
         RECALL_TEST_APP_DIR="$app_dir" RECALL_TEST_FAIL_COPY="${RECALL_TEST_FAIL_COPY:-0}" \
+        RECALL_TEST_FAIL_PUBLISH="${RECALL_TEST_FAIL_PUBLISH:-0}" \
         RECALL_TEST_FAIL_SWAP="${RECALL_TEST_FAIL_SWAP:-0}" \
         RECALL_TEST_INTERRUPT_SWAP="${RECALL_TEST_INTERRUPT_SWAP:-0}" \
         bash "$fixture_project/scripts/install-launcher.sh" "$@" > "$test_dir/installer-output.txt" 2>&1
@@ -120,11 +132,21 @@ fixture_project="$test_dir/project-moved"
 [[ "$("$app_dir/Recall.Desktop")" == 'Recall fixture first' ]]
 printf 'PASS: aplikasi terpasang tetap berjalan setelah project dipindahkan\n'
 
+printf 'outdated native asset\n' > "$fixture_project/artifacts/linux/obsolete.dll"
 run_installer second
 [[ "$("$app_dir/Recall.Desktop")" == 'Recall fixture second' ]]
+[[ ! -e "$fixture_project/artifacts/linux/obsolete.dll" && ! -e "$app_dir/obsolete.dll" ]]
 [[ $(cat -- "$data_home/recall/recall.db") == 'database sentinel' ]]
 [[ $(cat -- "$data_home/recall/recall.log") == 'log sentinel' ]]
 printf 'PASS: pembaruan mengganti aplikasi dan mempertahankan database/log\n'
+
+if RECALL_TEST_FAIL_PUBLISH=1 run_installer failed-build; then
+    printf 'FAIL: build yang gagal seharusnya menghentikan instalasi\n' >&2; exit 1
+fi
+[[ "$("$app_dir/Recall.Desktop")" == 'Recall fixture second' ]]
+[[ "$("$fixture_project/artifacts/linux/Recall.Desktop")" == 'Recall fixture second' ]]
+[[ -z $(find "$fixture_project/artifacts" -maxdepth 1 -name '.linux-publish-*' -print -quit) ]]
+printf 'PASS: build gagal mempertahankan hasil publish dan instalasi sebelumnya\n'
 
 if RECALL_TEST_FAIL_COPY=1 run_installer failed-copy; then
     printf 'FAIL: salinan yang gagal seharusnya menghentikan instalasi\n' >&2; exit 1

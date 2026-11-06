@@ -194,3 +194,14 @@ pribadi; periksa isinya sebelum membagikannya.
 2. Pilih teks versi, tekan Ctrl+C, lalu tempel ke editor teks. Jika versi build
    panjang, kotak versi tetap dapat di-scroll tanpa memotong dialog.
 3. Tutup melalui OK, Enter, dan Escape.
+
+## 11. Review hasil publish launcher Fedora
+
+1. Jalankan `bash scripts/install-launcher.sh --prepare-only` dari root repo.
+   Perintah ini membangun paket aplikasi tanpa memasangnya ke direktori pengguna.
+2. Jalankan `du -sh artifacts/linux` dan pastikan hasil publish untuk komputer
+   Fedora x64 hanya berukuran puluhan MB, bukan ratusan MB. Folder tersebut
+   tidak boleh memuat library native untuk Windows atau macOS.
+3. Jika ingin memperbarui launcher yang sudah terpasang, tutup Recall lalu
+   jalankan `bash scripts/install-launcher.sh`. Buka dari launcher Fedora dan
+   pastikan pencarian serta dialog tetap dapat digunakan.

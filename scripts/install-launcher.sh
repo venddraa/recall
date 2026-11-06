@@ -28,6 +28,7 @@ ownership_marker='.recall-managed-app'
 ownership_value='Recall managed application v1'
 staging_dir=''
 backup_dir=''
+publish_staging=''
 
 restore_previous_installation() {
     if [[ -n "$backup_dir" && -d "$backup_dir/app" && ! -e "$app_dir" && ! -L "$app_dir" ]]; then
@@ -45,6 +46,9 @@ cleanup_staging() {
     restore_previous_installation
     if [[ -n "$staging_dir" && -d "$staging_dir" ]]; then
         rm -rf -- "$staging_dir"
+    fi
+    if [[ -n "$publish_staging" && -d "$publish_staging" ]]; then
+        rm -rf -- "$publish_staging"
     fi
 }
 trap cleanup_staging EXIT
@@ -72,12 +76,26 @@ check_app_target
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export AVALONIA_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
+runtime_id=$(dotnet msbuild "$project_dir/src/Recall.Desktop/Recall.Desktop.csproj" \
+    -getProperty:NETCoreSdkRuntimeIdentifier)
+[[ -n "$runtime_id" ]] || { printf 'RID Linux tidak dapat ditentukan dari .NET SDK.\n' >&2; exit 1; }
 printf 'Membangun Recall. Tutup Recall terlebih dahulu jika sedang berjalan.\n'
+install -d -- "$project_dir/artifacts"
+publish_staging=$(mktemp -d "$project_dir/artifacts/.linux-publish-XXXXXX")
 dotnet publish "$project_dir/src/Recall.Desktop/Recall.Desktop.csproj" \
-    --configuration Release --no-restore --self-contained false \
-    --disable-build-servers -m:1 --output "$publish_dir"
-[[ -x "$publish_dir/Recall.Desktop" ]] || { printf 'Executable Recall tidak ditemukan.\n' >&2; exit 1; }
+    --configuration Release --runtime "$runtime_id" --self-contained false -p:NuGetAudit=false \
+    --disable-build-servers -m:1 --output "$publish_staging"
+[[ -x "$publish_staging/Recall.Desktop" ]] || { printf 'Executable Recall tidak ditemukan.\n' >&2; exit 1; }
 [[ -f "$project_dir/packaging/linux/recall.svg" ]] || { printf 'Ikon Recall tidak ditemukan.\n' >&2; exit 1; }
+if [[ -L "$publish_dir" || ( -e "$publish_dir" && ! -d "$publish_dir" ) ]]; then
+    printf 'Folder output build tidak dikenali: %s\n' "$publish_dir" >&2
+    exit 1
+fi
+if [[ -d "$publish_dir" ]]; then
+    rm -rf -- "$publish_dir"
+fi
+mv -T -- "$publish_staging" "$publish_dir"
+publish_staging=''
 
 # Desktop Entry memiliki aturan escaping sendiri, bukan aturan shell.
 desktop_string() {
